@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "dev",
+      "runtimeExecutable": "/Users/Alexander/.local/share/fnm/node-versions/v20.20.2/installation/bin/npx",
+      "runtimeArgs": ["next", "dev", "--turbopack"],
+      "port": 3000
+    }
+  ]
+}
