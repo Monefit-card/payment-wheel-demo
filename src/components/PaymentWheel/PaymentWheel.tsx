@@ -66,23 +66,36 @@ export function PaymentWheel({ state }: PaymentWheelProps) {
         onAmountChange={setAmount}
       />
 
-      {/* Contextual title + description + interest */}
-      {canPay && accountState.isInPaymentPeriod && !accountState.isCardBlocked && (
+      {/* Contextual text section */}
+      {canPay && (
         <div className="text-center px-6 mt-1">
           <AnimatePresence mode="wait">
             <motion.div
-              key={zone}
+              key={accountState.isCardBlocked ? 'blocked' : zone}
               initial={{ opacity: 0, y: 4 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -4 }}
               transition={{ duration: 0.15 }}
             >
-              <h2 className="text-base font-bold" style={{ color: COLORS.textPrimary }}>
-                {zoneInfo.title}
-              </h2>
-              <p className="text-xs mt-1 leading-relaxed" style={{ color: COLORS.textSecondary }}>
-                {zoneInfo.description}
-              </p>
+              {accountState.isCardBlocked ? (
+                <>
+                  <h2 className="text-base font-bold" style={{ color: COLORS.textDanger }}>
+                    Card blocked
+                  </h2>
+                  <p className="text-xs mt-1" style={{ color: COLORS.textSecondary }}>
+                    Pay the minimum amount to unblock your card and restore access.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <h2 className="text-base font-bold" style={{ color: COLORS.textPrimary }}>
+                    {zoneInfo.title}
+                  </h2>
+                  <p className="text-xs mt-1 leading-relaxed" style={{ color: COLORS.textSecondary }}>
+                    {zoneInfo.description}
+                  </p>
+                </>
+              )}
               {showInterest && interestProjection > 0 && (
                 <p className="text-sm font-semibold mt-1.5 tabular-nums" style={{ color: COLORS.textInterest }}>
                   €{interestProjection.toFixed(2)} interest charge on {dueMonth}
@@ -98,33 +111,8 @@ export function PaymentWheel({ state }: PaymentWheelProps) {
         </div>
       )}
 
-      {/* Card blocked message */}
-      {accountState.isCardBlocked && (
-        <div className="text-center px-6 mt-1">
-          <h2 className="text-base font-bold" style={{ color: COLORS.textDanger }}>
-            Card blocked
-          </h2>
-          <p className="text-xs mt-1" style={{ color: COLORS.textSecondary }}>
-            Pay the minimum amount to unblock your card and restore access.
-            {showInterest && interestProjection > 0 && ` €${interestProjection.toFixed(2)} interest will be charged on ${dueMonth}.`}
-          </p>
-        </div>
-      )}
-
-      {/* Outside payment period */}
-      {!accountState.isInPaymentPeriod && canPay && (
-        <div className="text-center px-6 mt-1">
-          <h2 className="text-base font-bold" style={{ color: COLORS.textPrimary }}>
-            No payment due
-          </h2>
-          <p className="text-xs mt-1" style={{ color: COLORS.textSecondary }}>
-            Your next payment is due on {dueMonth}.
-          </p>
-        </div>
-      )}
-
-      {/* Pay button */}
-      {canPay && accountState.isInPaymentPeriod && (
+      {/* Pay button — always visible when there's a balance */}
+      {canPay && (
         <div className="mt-5 px-5">
           <motion.button
             className="w-full py-3.5 rounded-xl text-base font-semibold"
@@ -145,19 +133,9 @@ export function PaymentWheel({ state }: PaymentWheelProps) {
         </div>
       )}
 
-      {/* Outside period: voluntary pay */}
-      {!accountState.isInPaymentPeriod && canPay && (
-        <div className="mt-5 px-5">
-          <button
-            className="w-full py-3.5 rounded-xl text-sm font-medium"
-            style={{
-              color: COLORS.textSecondary,
-              border: `1px solid ${COLORS.surfaceBorder}`,
-            }}
-          >
-            Make a voluntary payment
-          </button>
-        </div>
+      {/* Outside period: no extra button needed, main pay button handles it */}
+      {false && (
+        <div />
       )}
     </div>
   );

@@ -41,7 +41,7 @@ export function WheelSVG({
 
   const trackPath = useMemo(() => getFullTrackPath(), []);
   const { totalBalance, dueBalance, isCardBlocked } = accountState;
-  const isDisabled = isZeroBalance || isCardBlocked || !accountState.isInPaymentPeriod;
+  const isDisabled = isZeroBalance;
 
   const minRatio = totalBalance > 0 ? amountToRatio(minimumPayment, 0, totalBalance) : 0;
   const dueRatio = totalBalance > 0 ? amountToRatio(dueBalance, 0, totalBalance) : 0;
@@ -191,7 +191,7 @@ export function WheelSVG({
         )}
 
         {/* Grey dot milestones — ALL dots, including due */}
-        {!isZeroBalance && !isCardBlocked && accountState.isInPaymentPeriod && (
+        {!isZeroBalance && (
           <>
             {hasDistinctMin && greyDot(minPos, 'min-dot')}
             {hasDueMilestone && greyDot(duePos, 'due-dot')}
@@ -200,7 +200,7 @@ export function WheelSVG({
         )}
 
         {/* Draggable marker */}
-        {!isZeroBalance && !isCardBlocked && accountState.isInPaymentPeriod && (
+        {!isZeroBalance && (
           <g style={{ cursor: 'grab' }}>
             <circle
               cx={markerPos.x}

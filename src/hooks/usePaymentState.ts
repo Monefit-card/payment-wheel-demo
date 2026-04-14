@@ -27,9 +27,8 @@ export function usePaymentState() {
   // Clamp selected amount
   const clampedAmount = useMemo(() => {
     if (!canPay) return 0;
-    if (accountState.isCardBlocked) return minimumPayment;
     return Math.max(0, Math.min(selectedAmount, accountState.totalBalance));
-  }, [selectedAmount, accountState, canPay, minimumPayment]);
+  }, [selectedAmount, accountState, canPay]);
 
   // Determine zone
   const zone: PaymentZone = useMemo(
