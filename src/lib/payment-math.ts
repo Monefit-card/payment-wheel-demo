@@ -39,7 +39,7 @@ export function formatDueDate(): string {
 
 export function formatDueDateShort(): string {
   const due = getDueDate();
-  return `15 ${due.toLocaleDateString('en-GB', { month: 'short' }).toUpperCase()}`;
+  return `15 ${due.toLocaleDateString('en-GB', { month: 'long' })}`;
 }
 
 export function formatCurrency(amount: number): string {
@@ -77,37 +77,37 @@ export function getZoneInfo(zone: PaymentZone): ZoneInfo {
     case 'below_minimum':
       return {
         zone,
-        title: 'Reduce your bill',
-        description: 'This will reduce your bill. Aim to pay at least the minimum before the due date.',
+        title: 'Reducing your bill',
+        description: 'Aim to pay at least the minimum before the due date.',
       };
     case 'at_minimum':
       return {
         zone,
         title: 'Minimum payment',
-        description: 'This is the minimum amount due to keep your account in good standing. Pay more to reduce potential interest charges.',
+        description: 'This is the minimum you can pay to keep your account active.',
       };
     case 'between_min_due':
       return {
         zone,
-        title: 'Reduce interest',
-        description: 'The more you pay off before the due date the lower your potential interest charges.',
+        title: 'Reducing your bill',
+        description: 'Pay off your due balance to avoid interest charges.',
       };
     case 'at_due':
       return {
         zone,
-        title: 'Pay due balance',
-        description: 'Paying your due balance is recommended to avoid interest charges.',
+        title: 'Due balance',
+        description: 'Paying your due balance means you avoid interest charges.',
       };
     case 'between_due_total':
       return {
         zone,
-        title: 'Pay more',
-        description: 'This will free up your available credit and reduce the amount to pay next month.',
+        title: 'Paying more',
+        description: 'This will free up available credit and reduce next month\'s bill.',
       };
     case 'at_total':
       return {
         zone,
-        title: 'Pay full balance',
+        title: 'Total balance',
         description: 'Paying in full clears your balance and helps you stay ahead on your finances.',
       };
   }

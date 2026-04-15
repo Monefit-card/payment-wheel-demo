@@ -4,7 +4,6 @@ import { WheelSVG } from './WheelSVG';
 import { PaymentStateReturn } from '@/hooks/usePaymentState';
 import { COLORS } from '@/lib/constants';
 import { formatDueDateShort } from '@/lib/payment-math';
-import { getArcColor, amountToRatio } from '@/lib/arc-geometry';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface PaymentWheelProps {
@@ -25,28 +24,29 @@ export function PaymentWheel({ state }: PaymentWheelProps) {
     canPay,
   } = state;
 
-  const totalBalance = accountState.totalBalance;
-  const dueBalance = accountState.dueBalance;
-
-  const minRatio = totalBalance > 0 ? amountToRatio(minimumPayment, 0, totalBalance) : 0;
-  const dueRatio = totalBalance > 0 ? amountToRatio(dueBalance, 0, totalBalance) : 0;
-  const selectedRatio = totalBalance > 0 ? amountToRatio(selectedAmount, 0, totalBalance) : 0;
-  const buttonColor = getArcColor(selectedRatio, minRatio, dueRatio);
-
   const dueMonth = formatDueDateShort();
+  const isAtZero = selectedAmount <= 0;
+  const isRevolver = accountState.userType === 'revolver';
+
+  // Title logic: at 0 show default, otherwise show zone title
+  const title = isAtZero || isZeroBalance
+    ? 'Choose amount'
+    : accountState.isCardBlocked
+    ? 'Card blocked'
+    : zoneInfo.title;
+
+  // Subtitle logic: at 0 show due date, otherwise show zone description
+  const subtitle = isAtZero || isZeroBalance
+    ? `Pay by 11:59PM on ${dueMonth}`
+    : accountState.isCardBlocked
+    ? 'Pay the minimum amount to unblock your card and restore access.'
+    : zoneInfo.description;
 
   return (
     <div className="w-full max-w-md mx-auto">
-      {/* Header — centered */}
-      <div className="text-center px-5 mb-1 relative">
-        <h1 className="text-xl font-bold" style={{ color: COLORS.textPrimary }}>
-          {accountState.isCardBlocked ? 'Card Blocked' : 'Choose amount'}
-        </h1>
-        {accountState.isInPaymentPeriod && (
-          <p className="text-xs mt-1" style={{ color: COLORS.textSecondary }}>
-            Make payment by 11:59PM {dueMonth}
-          </p>
-        )}
+
+      {/* 1. Title + subtitle (fused) */}
+      <div className="text-center px-5 relative">
         <button
           className="absolute top-0 right-5 w-8 h-8 flex items-center justify-center rounded-full"
           style={{ color: COLORS.textSecondary }}
@@ -55,65 +55,66 @@ export function PaymentWheel({ state }: PaymentWheelProps) {
             <path d="M5 5l10 10M15 5L5 15" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
           </svg>
         </button>
+
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={isAtZero ? 'default' : accountState.isCardBlocked ? 'blocked' : zone}
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.15 }}
+          >
+            <h1
+              className="text-xl font-bold"
+              style={{ color: accountState.isCardBlocked && !isAtZero ? COLORS.textDanger : COLORS.textPrimary }}
+            >
+              {title}
+            </h1>
+            <p className="text-xs mt-1 leading-relaxed" style={{ color: COLORS.textSecondary }}>
+              {subtitle}
+            </p>
+          </motion.div>
+        </AnimatePresence>
       </div>
 
-      {/* Wheel */}
-      <WheelSVG
-        accountState={accountState}
-        selectedAmount={selectedAmount}
-        minimumPayment={minimumPayment}
-        isZeroBalance={isZeroBalance}
-        onAmountChange={setAmount}
-      />
+      {/* 2. Wheel */}
+      <div className="mt-2">
+        <WheelSVG
+          accountState={accountState}
+          selectedAmount={selectedAmount}
+          minimumPayment={minimumPayment}
+          isZeroBalance={isZeroBalance}
+          onAmountChange={setAmount}
+        />
+      </div>
 
-      {/* Contextual text section */}
-      {canPay && (
-        <div className="text-center px-6 mt-1">
+      {/* 3. Interest projection — under wheel */}
+      {canPay && !isZeroBalance && (
+        <div className="px-5">
           <AnimatePresence mode="wait">
             <motion.div
-              key={accountState.isCardBlocked ? 'blocked' : zone}
+              key={showInterest ? 'interest' : 'no-interest'}
               initial={{ opacity: 0, y: 4 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -4 }}
               transition={{ duration: 0.15 }}
             >
-              {accountState.isCardBlocked ? (
-                <>
-                  <h2 className="text-base font-bold" style={{ color: COLORS.textDanger }}>
-                    Card blocked
-                  </h2>
-                  <p className="text-xs mt-1" style={{ color: COLORS.textSecondary }}>
-                    Pay the minimum amount to unblock your card and restore access.
-                  </p>
-                </>
-              ) : (
-                <>
-                  <h2 className="text-base font-bold" style={{ color: COLORS.textPrimary }}>
-                    {zoneInfo.title}
-                  </h2>
-                  <p className="text-xs mt-1 leading-relaxed" style={{ color: COLORS.textSecondary }}>
-                    {zoneInfo.description}
-                  </p>
-                </>
-              )}
-              {showInterest && interestProjection > 0 && (
-                <p className="text-sm font-semibold mt-1.5 tabular-nums" style={{ color: COLORS.textInterest }}>
-                  €{interestProjection.toFixed(2)} interest charge on {dueMonth}
-                </p>
-              )}
-              {!showInterest && selectedAmount > 0 && (
-                <p className="text-xs font-medium mt-1.5" style={{ color: COLORS.textNoInterest }}>
-                  No interest charges
-                </p>
-              )}
+              <div className="text-xs tabular-nums text-center" style={{ color: COLORS.textSecondary }}>
+                {showInterest && interestProjection > 0
+                  ? isRevolver
+                    ? `Interest projection: €${interestProjection.toFixed(2)} over next 30 days`
+                    : `Interest projection: €${interestProjection.toFixed(2)} on 16 ${dueMonth.split(' ')[1]}`
+                  : 'No interest charges'
+                }
+              </div>
             </motion.div>
           </AnimatePresence>
         </div>
       )}
 
-      {/* Pay button — always visible when there's a balance */}
+      {/* 4. Pay button */}
       {canPay && (
-        <div className="mt-5 px-5">
+        <div className="mt-2 px-5">
           <motion.button
             className="w-full py-3.5 rounded-xl text-base font-semibold"
             style={{
@@ -124,6 +125,8 @@ export function PaymentWheel({ state }: PaymentWheelProps) {
           >
             Pay €{selectedAmount.toFixed(2)}
           </motion.button>
+
+          {/* 5. Other amount */}
           <button
             className="w-full text-center mt-3 text-sm font-medium"
             style={{ color: COLORS.textSecondary }}
@@ -131,11 +134,6 @@ export function PaymentWheel({ state }: PaymentWheelProps) {
             Other amount
           </button>
         </div>
-      )}
-
-      {/* Outside period: no extra button needed, main pay button handles it */}
-      {false && (
-        <div />
       )}
     </div>
   );

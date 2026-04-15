@@ -72,6 +72,15 @@ export function WheelSVG({
   const hasDistinctMin = minimumPayment < dueBalance - (totalBalance * 0.04);
   const hasDueMilestone = dueBalance < totalBalance;
 
+  // Curved text path for "CARD BALANCE" — arc hugging the inside top of the wheel
+  const balanceTextPath = useMemo(() => {
+    const r = WHEEL.radius - WHEEL.strokeWidth / 2 - 20; // inside the ring
+    const cx = WHEEL.cx;
+    const cy = WHEEL.cy;
+    // Clockwise arc across the top so text reads left-to-right
+    return describeArc(300, 420, cx, cy, r);
+  }, []);
+
   const getSVGPoint = useCallback((clientX: number, clientY: number) => {
     const svg = svgRef.current;
     if (!svg) return { x: 0, y: 0 };
@@ -190,12 +199,12 @@ export function WheelSVG({
           />
         )}
 
-        {/* Grey dot milestones — ALL dots, including due */}
+        {/* Grey dot milestones */}
         {!isZeroBalance && (
           <>
             {hasDistinctMin && greyDot(minPos, 'min-dot')}
             {hasDueMilestone && greyDot(duePos, 'due-dot')}
-            {hasDueMilestone && greyDot(totalPos, 'total-dot')}
+            {greyDot(totalPos, 'total-dot')}
           </>
         )}
 
@@ -235,16 +244,16 @@ export function WheelSVG({
           ) : (
             <>
               <div
-                className="text-[10px] font-semibold uppercase tracking-widest mb-1"
-                style={{ color: COLORS.textMuted }}
-              >
-                Balance: €{totalBalance.toFixed(2)}
-              </div>
-              <div
                 className="text-4xl font-bold tabular-nums"
                 style={{ color: COLORS.textPrimary }}
               >
                 €{selectedAmount.toFixed(2)}
+              </div>
+              <div
+                className="text-[10px] mt-1 tabular-nums"
+                style={{ color: COLORS.textMuted }}
+              >
+                of €{totalBalance.toFixed(2)}
               </div>
             </>
           )}
