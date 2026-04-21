@@ -69,8 +69,10 @@ export function WheelSVG({
     polarToCartesian(WHEEL.cx, WHEEL.cy, WHEEL.radius, ratioToAngle(0.999)),
   []);
 
-  const hasDistinctMin = minimumPayment < dueBalance - (totalBalance * 0.04);
-  const hasDueMilestone = dueBalance < totalBalance;
+  const hasDistinctMin =
+    minimumPayment > 0 && minimumPayment < dueBalance - totalBalance * 0.04;
+  const hasDueMilestone =
+    dueBalance > 0 && dueBalance < totalBalance - totalBalance * 0.01;
 
   // Curved text path for "CARD BALANCE" — arc hugging the inside top of the wheel
   const balanceTextPath = useMemo(() => {
@@ -110,18 +112,31 @@ export function WheelSVG({
     const snapDist = totalBalance * 0.03;
     let snappedTo: string | null = null;
 
-    if (Math.abs(amount - minimumPayment) < snapDist) {
-      amount = minimumPayment;
-      snappedTo = 'min';
-    } else if (Math.abs(amount - dueBalance) < snapDist) {
-      amount = dueBalance;
-      snappedTo = 'due';
-    } else if (Math.abs(amount - totalBalance) < snapDist || amount > totalBalance - snapDist) {
+    // Snap to the closest candidate within range (handles min & due overlapping)
+    const candidates: Array<{ value: number; label: string }> = [];
+    if (minimumPayment > 0) candidates.push({ value: minimumPayment, label: 'min' });
+    if (dueBalance > 0) candidates.push({ value: dueBalance, label: 'due' });
+    candidates.push({ value: totalBalance, label: 'total' });
+    candidates.push({ value: 0, label: 'zero' });
+
+    // Force total when we're past it (keeps cursor pinned to max)
+    if (amount > totalBalance - snapDist) {
       amount = totalBalance;
       snappedTo = 'total';
-    } else if (amount < snapDist) {
-      amount = 0;
-      snappedTo = 'zero';
+    } else {
+      let best: { value: number; label: string } | null = null;
+      let bestDist = snapDist;
+      for (const c of candidates) {
+        const d = Math.abs(amount - c.value);
+        if (d < bestDist) {
+          best = c;
+          bestDist = d;
+        }
+      }
+      if (best) {
+        amount = best.value;
+        snappedTo = best.label;
+      }
     }
 
     if (snappedTo && snappedTo !== lastSnap.current) {

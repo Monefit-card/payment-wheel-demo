@@ -123,9 +123,10 @@ export const PRESETS: Preset[] = [
       isCardBlocked: false,
     },
   },
+  /* ── Small balance (due ≤ €20 → min = due) ── */
   {
-    name: 'Small Balance (€15)',
-    description: 'Below €20 threshold',
+    name: 'Small Balance · T · Due = Total',
+    description: 'Below €20, no new purchases',
     state: {
       totalBalance: 15,
       dueBalance: 15,
@@ -136,17 +137,42 @@ export const PRESETS: Preset[] = [
     },
   },
   {
-    name: 'Near Threshold (€21)',
-    description: 'Just above €20',
+    name: 'Small Balance · T · Total > Due',
+    description: 'Due €15, total €60 (new purchases)',
     state: {
-      totalBalance: 21,
-      dueBalance: 21,
-      outstandingInterest: 0.50,
+      totalBalance: 60,
+      dueBalance: 15,
+      outstandingInterest: 0,
       userType: 'transactor',
       isInPaymentPeriod: true,
       isCardBlocked: false,
     },
   },
+  {
+    name: 'Small Balance · T · Outside',
+    description: 'Total €15, nothing due yet',
+    state: {
+      totalBalance: 15,
+      dueBalance: 0,
+      outstandingInterest: 0,
+      userType: 'transactor',
+      isInPaymentPeriod: false,
+      isCardBlocked: false,
+    },
+  },
+  {
+    name: 'Small Balance · Revolver',
+    description: 'Below €20, interest accruing',
+    state: {
+      totalBalance: 15,
+      dueBalance: 15,
+      outstandingInterest: 0,
+      userType: 'revolver',
+      isInPaymentPeriod: true,
+      isCardBlocked: false,
+    },
+  },
+
   {
     name: 'Card Blocked',
     description: 'Missed minimum payment',

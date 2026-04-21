@@ -8,9 +8,10 @@ import { motion, AnimatePresence } from 'motion/react';
 
 interface PaymentWheelProps {
   state: PaymentStateReturn;
+  onPay?: () => void;
 }
 
-export function PaymentWheel({ state }: PaymentWheelProps) {
+export function PaymentWheel({ state, onPay }: PaymentWheelProps) {
   const {
     accountState,
     selectedAmount,
@@ -122,6 +123,7 @@ export function PaymentWheel({ state }: PaymentWheelProps) {
               color: '#fff',
             }}
             whileTap={{ scale: 0.97 }}
+            onClick={onPay}
           >
             Pay €{selectedAmount.toFixed(2)}
           </motion.button>

@@ -16,10 +16,11 @@ export function usePaymentState() {
   const [accountState, setAccountState] = useState<AccountState>(defaultAccount);
   const [selectedAmount, setSelectedAmount] = useState<number>(defaultAccount.dueBalance);
 
-  const minimumPayment = useMemo(
-    () => calculateMinimumPayment(accountState.dueBalance, accountState.outstandingInterest),
-    [accountState.dueBalance, accountState.outstandingInterest]
-  );
+  // No minimum outside the payment period (billing cycle hasn't closed yet)
+  const minimumPayment = useMemo(() => {
+    if (!accountState.isInPaymentPeriod) return 0;
+    return calculateMinimumPayment(accountState.dueBalance, accountState.outstandingInterest);
+  }, [accountState.isInPaymentPeriod, accountState.dueBalance, accountState.outstandingInterest]);
 
   const isZeroBalance = accountState.totalBalance <= 0;
   const canPay = accountState.totalBalance > 0;
@@ -30,24 +31,53 @@ export function usePaymentState() {
     return Math.max(0, Math.min(selectedAmount, accountState.totalBalance));
   }, [selectedAmount, accountState, canPay]);
 
-  // Determine zone
-  const zone: PaymentZone = useMemo(
-    () => getPaymentZone(clampedAmount, minimumPayment, accountState.dueBalance, accountState.totalBalance),
-    [clampedAmount, minimumPayment, accountState.dueBalance, accountState.totalBalance]
+  // Contextual flags for zone copy
+  const dueEqualsTotal = useMemo(
+    () =>
+      accountState.totalBalance > 0 &&
+      Math.abs(accountState.dueBalance - accountState.totalBalance) < 0.01,
+    [accountState.dueBalance, accountState.totalBalance],
   );
 
-  // Interest projection (must be before zoneInfo)
+  const minEqualsDue = useMemo(
+    () =>
+      accountState.totalBalance > 0 &&
+      minimumPayment > 0 &&
+      Math.abs(minimumPayment - accountState.dueBalance) < 0.01,
+    [minimumPayment, accountState.dueBalance, accountState.totalBalance],
+  );
+
+  // Determine zone
+  const zone: PaymentZone = useMemo(
+    () =>
+      getPaymentZone(
+        clampedAmount,
+        minimumPayment,
+        accountState.dueBalance,
+        accountState.totalBalance,
+      ),
+    [clampedAmount, minimumPayment, accountState.dueBalance, accountState.totalBalance],
+  );
+
+  // Interest projection
   const interestProjection = useMemo(() => {
     if (!canPay || isZeroBalance) return 0;
     if (clampedAmount >= accountState.dueBalance) return 0;
     const remaining = accountState.dueBalance - clampedAmount;
-    const days = accountState.userType === 'revolver' ? 30 : 30;
-    return calculateInterestProjection(remaining, days);
+    return calculateInterestProjection(remaining, 30);
   }, [accountState, clampedAmount, canPay, isZeroBalance]);
 
   const showInterest = interestProjection > 0;
 
-  const zoneInfo: ZoneInfo = useMemo(() => getZoneInfo(zone), [zone]);
+  const zoneInfo: ZoneInfo = useMemo(
+    () =>
+      getZoneInfo(zone, {
+        dueEqualsTotal,
+        minEqualsDue,
+        userType: accountState.userType,
+      }),
+    [zone, dueEqualsTotal, minEqualsDue, accountState.userType],
+  );
 
   const setAmount = useCallback((amount: number) => {
     setSelectedAmount(amount);
@@ -55,7 +85,6 @@ export function usePaymentState() {
 
   const applyPreset = useCallback((state: AccountState) => {
     setAccountState(state);
-    // Default to due balance
     if (state.isCardBlocked) {
       setSelectedAmount(calculateMinimumPayment(state.dueBalance, state.outstandingInterest));
     } else if (state.dueBalance > 0) {

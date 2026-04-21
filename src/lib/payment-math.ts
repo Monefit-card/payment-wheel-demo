@@ -1,5 +1,5 @@
 import { INTEREST_RATE } from './constants';
-import { PaymentZone, ZoneInfo } from '@/types/payment';
+import { PaymentZone, ZoneInfo, UserType } from '@/types/payment';
 
 export function calculateMinimumPayment(
   dueBalance: number,
@@ -65,14 +65,36 @@ export function getPaymentZone(
   const snapRange = range * SNAP_THRESHOLD;
 
   if (Math.abs(amount - totalBalance) < snapRange || amount >= totalBalance) return 'at_total';
-  if (Math.abs(amount - dueBalance) < snapRange) return 'at_due';
-  if (Math.abs(amount - minimumPayment) < snapRange) return 'at_minimum';
-  if (amount < minimumPayment) return 'below_minimum';
+
+  // Closest-wins between min and due. Ties go to min so "Minimum payment" shows
+  // when min = due (small balance with total > due) — users need to know this is
+  // the minimum, not just "the due balance".
+  const minDist = minimumPayment > 0 ? Math.abs(amount - minimumPayment) : Infinity;
+  const dueDist = dueBalance > 0 ? Math.abs(amount - dueBalance) : Infinity;
+  const minInRange = minDist < snapRange;
+  const dueInRange = dueDist < snapRange;
+
+  if (minInRange && (!dueInRange || minDist <= dueDist)) return 'at_minimum';
+  if (dueInRange) return 'at_due';
+
+  if (minimumPayment > 0 && amount < minimumPayment) return 'below_minimum';
   if (amount < dueBalance) return 'between_min_due';
   return 'between_due_total';
 }
 
-export function getZoneInfo(zone: PaymentZone): ZoneInfo {
+/* ── Zone copy ──────────────────────────────────────────────────────────── */
+
+interface ZoneInfoOpts {
+  /** true when dueBalance === totalBalance (revolvers, or transactors whose due = total) */
+  dueEqualsTotal?: boolean;
+  /** true when minimumPayment === dueBalance (small-balance case, balance ≤ €20) */
+  minEqualsDue?: boolean;
+  userType?: UserType;
+}
+
+export function getZoneInfo(zone: PaymentZone, opts?: ZoneInfoOpts): ZoneInfo {
+  const { dueEqualsTotal = false, minEqualsDue = false, userType } = opts ?? {};
+
   switch (zone) {
     case 'below_minimum':
       return {
@@ -80,35 +102,61 @@ export function getZoneInfo(zone: PaymentZone): ZoneInfo {
         title: 'Reducing your bill',
         description: 'Aim to pay at least the minimum before the due date.',
       };
+
     case 'at_minimum':
       return {
         zone,
         title: 'Minimum payment',
         description: 'This is the minimum you can pay to keep your account active.',
       };
+
     case 'between_min_due':
       return {
         zone,
         title: 'Reducing your bill',
         description: 'Pay off your due balance to avoid interest charges.',
       };
+
     case 'at_due':
       return {
         zone,
         title: 'Due balance',
         description: 'Paying your due balance means you avoid interest charges.',
       };
+
     case 'between_due_total':
       return {
         zone,
-        title: 'Paying more',
-        description: 'This will free up available credit and reduce next month\'s bill.',
+        title: 'Paying early',
+        description: "This will free up available credit and reduce next month's bill.",
       };
-    case 'at_total':
+
+    case 'at_total': {
+      // Small balance: min = due = total — the one snap point is the minimum payment
+      if (minEqualsDue && dueEqualsTotal) {
+        return {
+          zone,
+          title: 'Minimum payment',
+          description: 'This is your minimum — and it clears your full balance.',
+        };
+      }
+      // Revolver or transactor where due = total — top of wheel is the due balance
+      if (dueEqualsTotal) {
+        return {
+          zone,
+          title: 'Due balance',
+          description:
+            userType === 'revolver'
+              ? 'Paying in full clears your balance and stops interest from accruing.'
+              : 'Paying your due balance means you avoid interest charges.',
+        };
+      }
+      // Standard transactor: total > due
       return {
         zone,
         title: 'Total balance',
         description: 'Paying in full clears your balance and helps you stay ahead on your finances.',
       };
+    }
   }
 }
