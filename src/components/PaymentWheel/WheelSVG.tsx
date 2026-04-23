@@ -17,6 +17,7 @@ import { useHaptic } from '@/hooks/useHaptic';
 import { AccountState } from '@/types/payment';
 
 const DOT_R = 7;
+const STEP_COUNT = 100;
 
 interface WheelSVGProps {
   accountState: AccountState;
@@ -38,6 +39,7 @@ export function WheelSVG({
   const lastAngle = useRef<number | null>(null);
   const { snap, tick } = useHaptic();
   const lastSnap = useRef<string | null>(null);
+  const lastStepIndex = useRef<number | null>(null);
 
   const trackPath = useMemo(() => getFullTrackPath(), []);
   const { totalBalance, dueBalance, isCardBlocked } = accountState;
@@ -110,9 +112,11 @@ export function WheelSVG({
     let amount = ratioToAmount(ratio, 0, totalBalance);
 
     const snapDist = totalBalance * 0.03;
+    const stepSize = totalBalance / STEP_COUNT;
     let snappedTo: string | null = null;
 
-    // Snap to the closest candidate within range (handles min & due overlapping)
+    // Anchor snapping: candidates win over the grid. 3% window comfortably
+    // exceeds the 1% grid step, so anchors always pull cleanly off-grid.
     const candidates: Array<{ value: number; label: string }> = [];
     if (minimumPayment > 0) candidates.push({ value: minimumPayment, label: 'min' });
     if (dueBalance > 0) candidates.push({ value: dueBalance, label: 'due' });
@@ -136,15 +140,27 @@ export function WheelSVG({
       if (best) {
         amount = best.value;
         snappedTo = best.label;
+      } else if (stepSize > 0) {
+        // Between anchors, quantise to the 100-step grid. Round to cents so
+        // values like €2.9499999… display cleanly.
+        amount = Math.round(amount / stepSize) * stepSize;
+        amount = Math.round(amount * 100) / 100;
       }
     }
 
+    // Haptics: strong snap when entering an anchor; a light tick only when
+    // crossing a new grid step (not on every pointer move).
     if (snappedTo && snappedTo !== lastSnap.current) {
       snap();
       lastSnap.current = snappedTo;
+      lastStepIndex.current = null;
     } else if (!snappedTo) {
       lastSnap.current = null;
-      tick();
+      const stepIndex = stepSize > 0 ? Math.round(amount / stepSize) : 0;
+      if (lastStepIndex.current !== stepIndex) {
+        tick();
+        lastStepIndex.current = stepIndex;
+      }
     }
 
     onAmountChange(Math.max(0, Math.min(totalBalance, amount)));
@@ -168,6 +184,7 @@ export function WheelSVG({
     isDragging.current = false;
     lastAngle.current = null;
     lastSnap.current = null;
+    lastStepIndex.current = null;
   }, []);
 
   // Grey dot helper
