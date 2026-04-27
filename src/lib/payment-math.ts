@@ -22,10 +22,27 @@ export function calculateInterestProjection(
 }
 
 export function getDueDate(): Date {
+  // Billing period runs 16th → 15th. Due date = 15th of the period's closing
+  // month: on/before the 15th it's this month's 15th, otherwise next month's.
   const now = new Date();
-  const year = now.getMonth() === 11 ? now.getFullYear() + 1 : now.getFullYear();
-  const month = now.getMonth() === 11 ? 0 : now.getMonth() + 1;
-  return new Date(year, month, 15);
+  const day = now.getDate();
+  if (day <= 15) {
+    return new Date(now.getFullYear(), now.getMonth(), 15);
+  }
+  const rollsYear = now.getMonth() === 11;
+  return new Date(
+    rollsYear ? now.getFullYear() + 1 : now.getFullYear(),
+    rollsYear ? 0 : now.getMonth() + 1,
+    15,
+  );
+}
+
+export function getDueMonth(): Date {
+  // The bill is named after the earlier month of the 16th→15th period:
+  // on/before the 15th, that's the previous month; otherwise the current one.
+  const now = new Date();
+  const offset = now.getDate() <= 15 ? -1 : 0;
+  return new Date(now.getFullYear(), now.getMonth() + offset, 1);
 }
 
 export function formatDueDate(): string {
@@ -40,6 +57,10 @@ export function formatDueDate(): string {
 export function formatDueDateShort(): string {
   const due = getDueDate();
   return `15 ${due.toLocaleDateString('en-GB', { month: 'long' })}`;
+}
+
+export function formatDueMonth(): string {
+  return getDueMonth().toLocaleDateString('en-GB', { month: 'long' });
 }
 
 export function formatCurrency(amount: number): string {
@@ -94,68 +115,75 @@ interface ZoneInfoOpts {
 
 export function getZoneInfo(zone: PaymentZone, opts?: ZoneInfoOpts): ZoneInfo {
   const { dueEqualsTotal = false, minEqualsDue = false, userType } = opts ?? {};
+  const dueDate = formatDueDateShort(); // "15 May"
+  const dueMonth = formatDueMonth();    // "April"
 
   switch (zone) {
     case 'below_minimum':
       return {
         zone,
-        title: 'Reducing your bill',
-        description: 'Aim to pay at least the minimum before the due date.',
+        title: 'Below minimum',
+        description: `Pay a little more by ${dueDate} to keep your account active.`,
       };
 
     case 'at_minimum':
       return {
         zone,
         title: 'Minimum payment',
-        description: 'This is the minimum you can pay to keep your account active.',
+        description: `Pay this by ${dueDate} to keep your account active. Pay more to reduce your interest charges.`,
       };
 
     case 'between_min_due':
       return {
         zone,
-        title: 'Reducing your bill',
-        description: 'Pay off your due balance to avoid interest charges.',
+        title: 'Partial payment',
+        description: `Pay this by ${dueDate} to cover more of your ${dueMonth} balance and reduce your interest charges.`,
       };
 
     case 'at_due':
       return {
         zone,
-        title: 'Due balance',
-        description: 'Paying your due balance means you avoid interest charges.',
+        title: `${dueMonth} balance`,
+        description: `Pay this by ${dueDate} to cover your ${dueMonth} balance and avoid any interest.`,
       };
 
     case 'between_due_total':
       return {
         zone,
-        title: 'Paying early',
-        description: "This will free up available credit and reduce next month's bill.",
+        title: 'Early payment',
+        description: "Pay this to free up available credit and reduce next month's bill.",
       };
 
     case 'at_total': {
-      // Small balance: min = due = total — the one snap point is the minimum payment
+      // Small balance: min = due = total — the single snap point is the minimum.
       if (minEqualsDue && dueEqualsTotal) {
         return {
           zone,
           title: 'Minimum payment',
-          description: 'This is your minimum — and it clears your full balance.',
+          description: `Pay this by ${dueDate} to clear your full balance and keep your account active.`,
         };
       }
-      // Revolver or transactor where due = total — top of wheel is the due balance
+      // Revolver with due = total: carried debt, interest is the dominant concern.
+      if (dueEqualsTotal && userType === 'revolver') {
+        return {
+          zone,
+          title: 'Total balance',
+          description: 'Pay this to clear your balance and stop interest from accruing.',
+        };
+      }
+      // Transactor with due = total: there's no carried balance, so "total" = this period's bill.
       if (dueEqualsTotal) {
         return {
           zone,
-          title: 'Due balance',
-          description:
-            userType === 'revolver'
-              ? 'Paying in full clears your balance and stops interest from accruing.'
-              : 'Paying your due balance means you avoid interest charges.',
+          title: `${dueMonth} balance`,
+          description: `Pay this by ${dueDate} to cover your ${dueMonth} balance and avoid any interest.`,
         };
       }
-      // Standard transactor: total > due
+      // Standard: total > due.
       return {
         zone,
         title: 'Total balance',
-        description: 'Paying in full clears your balance and helps you stay ahead on your finances.',
+        description: 'Pay this to clear your full balance and stay ahead on your finances.',
       };
     }
   }
