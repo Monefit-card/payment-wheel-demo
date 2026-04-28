@@ -51,8 +51,8 @@ export const ANIMATION = {
 export const INTEREST_RATE = 0.1999;
 
 export const PRESETS: Preset[] = [
-  {
-    name: 'Transactor — Normal',
+  /* 1 */ {
+    name: 'Transactor — Standard',
     description: 'In period, total > due',
     state: {
       totalBalance: 295,
@@ -63,9 +63,21 @@ export const PRESETS: Preset[] = [
       isCardBlocked: false,
     },
   },
-  {
+  /* 2 */ {
+    name: 'Transactor — Standard (Small balance)',
+    description: 'Small bill (≤ €20) plus new spending',
+    state: {
+      totalBalance: 60,
+      dueBalance: 15,
+      outstandingInterest: 0,
+      userType: 'transactor',
+      isInPaymentPeriod: true,
+      isCardBlocked: false,
+    },
+  },
+  /* 3 */ {
     name: 'Transactor — Due = Total',
-    description: 'In period, no new transactions',
+    description: 'In period, no new spending',
     state: {
       totalBalance: 1200,
       dueBalance: 1200,
@@ -75,9 +87,21 @@ export const PRESETS: Preset[] = [
       isCardBlocked: false,
     },
   },
-  {
-    name: 'Transactor — Outside',
-    description: 'Outside payment period',
+  /* 4 */ {
+    name: 'Transactor — Due = Total (Small balance)',
+    description: '≤ €20 owed, no new spending',
+    state: {
+      totalBalance: 15,
+      dueBalance: 15,
+      outstandingInterest: 0,
+      userType: 'transactor',
+      isInPaymentPeriod: true,
+      isCardBlocked: false,
+    },
+  },
+  /* 5 */ {
+    name: 'Transactor — Outside period',
+    description: 'Bill paid, between billing cycles',
     state: {
       totalBalance: 800,
       dueBalance: 0,
@@ -87,9 +111,21 @@ export const PRESETS: Preset[] = [
       isCardBlocked: false,
     },
   },
-  {
-    name: 'Revolver — Normal',
-    description: 'In period, interest accruing',
+  /* 6 */ {
+    name: 'Transactor — Outside period (Small balance)',
+    description: 'Small total, between billing cycles',
+    state: {
+      totalBalance: 15,
+      dueBalance: 0,
+      outstandingInterest: 0,
+      userType: 'transactor',
+      isInPaymentPeriod: false,
+      isCardBlocked: false,
+    },
+  },
+  /* 7 */ {
+    name: 'Revolver — Standard',
+    description: 'In period, carrying interest',
     state: {
       totalBalance: 3000,
       dueBalance: 3000,
@@ -99,9 +135,21 @@ export const PRESETS: Preset[] = [
       isCardBlocked: false,
     },
   },
-  {
-    name: 'Revolver — Outside',
-    description: 'Outside payment period',
+  /* 8 */ {
+    name: 'Revolver — Standard (Small balance)',
+    description: '≤ €20 owed, carrying interest',
+    state: {
+      totalBalance: 15,
+      dueBalance: 15,
+      outstandingInterest: 0,
+      userType: 'revolver',
+      isInPaymentPeriod: true,
+      isCardBlocked: false,
+    },
+  },
+  /* 9 */ {
+    name: 'Revolver — Outside period',
+    description: 'Carrying interest, between billing cycles',
     state: {
       totalBalance: 3000,
       dueBalance: 3000,
@@ -111,8 +159,20 @@ export const PRESETS: Preset[] = [
       isCardBlocked: false,
     },
   },
-  {
-    name: 'Zero Balance',
+  /* 10 */ {
+    name: 'Revolver — Outside period (Small balance)',
+    description: 'Small total, carrying interest, between cycles',
+    state: {
+      totalBalance: 15,
+      dueBalance: 15,
+      outstandingInterest: 2,
+      userType: 'revolver',
+      isInPaymentPeriod: false,
+      isCardBlocked: false,
+    },
+  },
+  /* 11 */ {
+    name: 'Zero balance',
     description: 'Nothing owed',
     state: {
       totalBalance: 0,
@@ -123,58 +183,8 @@ export const PRESETS: Preset[] = [
       isCardBlocked: false,
     },
   },
-  /* ── Small balance (due ≤ €20 → min = due) ── */
-  {
-    name: 'Small Balance · T · Due = Total',
-    description: 'Below €20, no new purchases',
-    state: {
-      totalBalance: 15,
-      dueBalance: 15,
-      outstandingInterest: 0,
-      userType: 'transactor',
-      isInPaymentPeriod: true,
-      isCardBlocked: false,
-    },
-  },
-  {
-    name: 'Small Balance · T · Total > Due',
-    description: 'Due €15, total €60 (new purchases)',
-    state: {
-      totalBalance: 60,
-      dueBalance: 15,
-      outstandingInterest: 0,
-      userType: 'transactor',
-      isInPaymentPeriod: true,
-      isCardBlocked: false,
-    },
-  },
-  {
-    name: 'Small Balance · T · Outside',
-    description: 'Total €15, nothing due yet',
-    state: {
-      totalBalance: 15,
-      dueBalance: 0,
-      outstandingInterest: 0,
-      userType: 'transactor',
-      isInPaymentPeriod: false,
-      isCardBlocked: false,
-    },
-  },
-  {
-    name: 'Small Balance · Revolver',
-    description: 'Below €20, interest accruing',
-    state: {
-      totalBalance: 15,
-      dueBalance: 15,
-      outstandingInterest: 0,
-      userType: 'revolver',
-      isInPaymentPeriod: true,
-      isCardBlocked: false,
-    },
-  },
-
-  {
-    name: 'Card Blocked',
+  /* 12 */ {
+    name: 'Card blocked',
     description: 'Missed minimum payment',
     state: {
       totalBalance: 5000,

@@ -92,10 +92,15 @@ export function getArcColor(
   minRatio: number,
   dueRatio: number
 ): string {
-  if (ratio <= minRatio) {
+  // When min and due collapse (small balance), the merged point is the bill —
+  // it should land on green, not orange. Skip the at-min orange branch.
+  const merged = Math.abs(minRatio - dueRatio) < 0.005;
+
+  if (!merged && ratio <= minRatio) {
     return '#f97316'; // orange
   }
   if (ratio < dueRatio) {
+    if (merged) return '#f97316'; // orange below the merged point
     const t = (ratio - minRatio) / (dueRatio - minRatio);
     return interpolateColor('#f97316', '#22c55e', t);
   }

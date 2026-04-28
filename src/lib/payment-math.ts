@@ -80,16 +80,33 @@ export function getPaymentZone(
   dueBalance: number,
   totalBalance: number
 ): PaymentZone {
-  if (totalBalance <= 0) return 'at_due';
+  if (totalBalance <= 0) return 'at_zero';
 
   const range = totalBalance;
   const snapRange = range * SNAP_THRESHOLD;
+  const dueIsTotal =
+    dueBalance > 0 &&
+    (Math.abs(dueBalance - totalBalance) < snapRange || dueBalance >= totalBalance);
+  const minIsDue =
+    minimumPayment > 0 &&
+    dueBalance > 0 &&
+    Math.abs(minimumPayment - dueBalance) < snapRange;
 
-  if (Math.abs(amount - totalBalance) < snapRange || amount >= totalBalance) return 'at_total';
+  // Top of wheel. When due = total there's no "beyond due" range — the top
+  // anchor reads as `at_due` (the bill), not `at_total`.
+  if (Math.abs(amount - totalBalance) < snapRange || amount >= totalBalance) {
+    return dueIsTotal ? 'at_due' : 'at_total';
+  }
 
-  // Closest-wins between min and due. Ties go to min so "Minimum payment" shows
-  // when min = due (small balance with total > due) — users need to know this is
-  // the minimum, not just "the due balance".
+  // Small balance: min and due collapse into one anchor. The merged point is
+  // labelled `at_due` (it's the bill), and the range below it is `below_minimum`
+  // — there's no separate at_minimum or between_min_due.
+  if (minIsDue) {
+    if (Math.abs(amount - dueBalance) < snapRange) return 'at_due';
+    return amount < dueBalance ? 'below_minimum' : 'between_due_total';
+  }
+
+  // Standard case: separate min and due anchors. Closest-wins between them.
   const minDist = minimumPayment > 0 ? Math.abs(amount - minimumPayment) : Infinity;
   const dueDist = dueBalance > 0 ? Math.abs(amount - dueBalance) : Infinity;
   const minInRange = minDist < snapRange;
@@ -119,6 +136,13 @@ export function getZoneInfo(zone: PaymentZone, opts?: ZoneInfoOpts): ZoneInfo {
   const dueMonth = formatDueMonth();    // "April"
 
   switch (zone) {
+    case 'at_zero':
+      return {
+        zone,
+        title: 'All clear',
+        description: 'Nothing owed.',
+      };
+
     case 'below_minimum':
       return {
         zone,
@@ -140,12 +164,26 @@ export function getZoneInfo(zone: PaymentZone, opts?: ZoneInfoOpts): ZoneInfo {
         description: `Pay this by ${dueDate} to cover more of your ${dueMonth} balance and reduce your interest charges.`,
       };
 
-    case 'at_due':
+    case 'at_due': {
+      // Revolver where due = total (and not the small-balance merged case):
+      // emphasise stopping interest.
+      if (dueEqualsTotal && !minEqualsDue && userType === 'revolver') {
+        return {
+          zone,
+          title: 'Total balance',
+          description: 'Pay this to clear your balance and stop interest from accruing.',
+        };
+      }
+      // Default — paying the bill in full clears interest. Covers:
+      //   • standard transactor at the due point
+      //   • transactor due = total
+      //   • small balance (min = due, with or without due = total)
       return {
         zone,
         title: `${dueMonth} balance`,
         description: `Pay this by ${dueDate} to cover your ${dueMonth} balance and avoid any interest.`,
       };
+    }
 
     case 'between_due_total':
       return {
@@ -154,37 +192,11 @@ export function getZoneInfo(zone: PaymentZone, opts?: ZoneInfoOpts): ZoneInfo {
         description: "Pay this to free up available credit and reduce next month's bill.",
       };
 
-    case 'at_total': {
-      // Small balance: min = due = total — the single snap point is the minimum.
-      if (minEqualsDue && dueEqualsTotal) {
-        return {
-          zone,
-          title: 'Minimum payment',
-          description: `Pay this by ${dueDate} to clear your full balance and keep your account active.`,
-        };
-      }
-      // Revolver with due = total: carried debt, interest is the dominant concern.
-      if (dueEqualsTotal && userType === 'revolver') {
-        return {
-          zone,
-          title: 'Total balance',
-          description: 'Pay this to clear your balance and stop interest from accruing.',
-        };
-      }
-      // Transactor with due = total: there's no carried balance, so "total" = this period's bill.
-      if (dueEqualsTotal) {
-        return {
-          zone,
-          title: `${dueMonth} balance`,
-          description: `Pay this by ${dueDate} to cover your ${dueMonth} balance and avoid any interest.`,
-        };
-      }
-      // Standard: total > due.
+    case 'at_total':
       return {
         zone,
         title: 'Total balance',
         description: 'Pay this to clear your full balance and stay ahead on your finances.',
       };
-    }
   }
 }

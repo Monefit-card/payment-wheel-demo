@@ -1,6 +1,7 @@
 export type UserType = 'transactor' | 'revolver';
 
 export type PaymentZone =
+  | 'at_zero'
   | 'below_minimum'
   | 'at_minimum'
   | 'between_min_due'
