@@ -20,6 +20,7 @@ export function PaymentWheel({ state, onPay }: PaymentWheelProps) {
     setAmount,
     minimumPayment,
     zoneInfo,
+    zoneEducation,
     showInterest,
     interestProjection,
     isZeroBalance,
@@ -136,6 +137,7 @@ export function PaymentWheel({ state, onPay }: PaymentWheelProps) {
         isOpen={drawerOpen}
         onClose={() => setDrawerOpen(false)}
         zoneInfo={zoneInfo}
+        description={zoneEducation}
       />
     </div>
   );

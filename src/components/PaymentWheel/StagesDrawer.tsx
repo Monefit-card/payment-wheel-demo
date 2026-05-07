@@ -8,9 +8,15 @@ interface StagesDrawerProps {
   isOpen: boolean;
   onClose: () => void;
   zoneInfo: ZoneInfo;
+  description: string;
 }
 
-export function StagesDrawer({ isOpen, onClose, zoneInfo }: StagesDrawerProps) {
+export function StagesDrawer({
+  isOpen,
+  onClose,
+  zoneInfo,
+  description,
+}: StagesDrawerProps) {
   return (
     <AnimatePresence>
       {isOpen && (
@@ -73,7 +79,7 @@ export function StagesDrawer({ isOpen, onClose, zoneInfo }: StagesDrawerProps) {
                 className="text-sm leading-relaxed"
                 style={{ color: COLORS.textSecondary }}
               >
-                {zoneInfo.description}
+                {description}
               </p>
             </div>
           </motion.div>

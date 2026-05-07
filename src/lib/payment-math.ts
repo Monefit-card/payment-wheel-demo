@@ -200,3 +200,43 @@ export function getZoneInfo(zone: PaymentZone, opts?: ZoneInfoOpts): ZoneInfo {
       };
   }
 }
+
+/* ── Drawer / educational copy ──────────────────────────────────────────── */
+
+/**
+ * Long-form explanation of a stage, used in the info drawer. Date-free —
+ * focuses on what each stage *means* rather than what to do this period.
+ */
+export function getZoneEducation(zone: PaymentZone, opts?: ZoneInfoOpts): string {
+  const { dueEqualsTotal = false, minEqualsDue = false, userType } = opts ?? {};
+
+  switch (zone) {
+    case 'at_zero':
+      return "Your balance is fully paid off — nothing is owed right now.";
+
+    case 'below_minimum':
+      return "This is less than the minimum payment required to keep your account in good standing. Falling short risks late fees and can get your card blocked.";
+
+    case 'at_minimum':
+      return "The smallest amount you can pay this period to keep your card active. Anything left unpaid rolls forward and starts accruing interest until it's cleared.";
+
+    case 'between_min_due':
+      return "More than the minimum, but less than your full bill. Whatever you don't cover will roll forward to next period and start accruing interest.";
+
+    case 'at_due': {
+      if (minEqualsDue && dueEqualsTotal) {
+        return "Pays off everything you owe. Because the balance is small, the minimum, the bill, and the total are all the same amount.";
+      }
+      if (dueEqualsTotal && userType === 'revolver') {
+        return "Pays off everything you owe, including any balance you've been carrying. This stops interest from accruing on your account.";
+      }
+      return "Your bill for this period — everything you've spent since your last statement. Paying it in full clears the bill and avoids any interest.";
+    }
+
+    case 'between_due_total':
+      return "More than your bill — you're paying ahead. This frees up available credit and reduces what you'll owe next period.";
+
+    case 'at_total':
+      return "Clears everything you owe — this period's bill plus anything carried forward. You'll start the next period with a clean slate.";
+  }
+}

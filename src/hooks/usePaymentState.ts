@@ -7,6 +7,7 @@ import {
   calculateInterestProjection,
   getPaymentZone,
   getZoneInfo,
+  getZoneEducation,
 } from '@/lib/payment-math';
 import { PRESETS } from '@/lib/constants';
 
@@ -79,6 +80,16 @@ export function usePaymentState() {
     [zone, dueEqualsTotal, minEqualsDue, accountState.userType],
   );
 
+  const zoneEducation: string = useMemo(
+    () =>
+      getZoneEducation(zone, {
+        dueEqualsTotal,
+        minEqualsDue,
+        userType: accountState.userType,
+      }),
+    [zone, dueEqualsTotal, minEqualsDue, accountState.userType],
+  );
+
   const setAmount = useCallback((amount: number) => {
     setSelectedAmount(amount);
   }, []);
@@ -102,6 +113,7 @@ export function usePaymentState() {
     minimumPayment,
     zone,
     zoneInfo,
+    zoneEducation,
     interestProjection,
     showInterest,
     isZeroBalance,
