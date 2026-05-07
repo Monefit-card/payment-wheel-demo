@@ -63,10 +63,10 @@ When the user drags the wheel, the title and subtitle above the wheel swap to:
 | `below_minimum` | `0 < amount < minimumPayment` | Below minimum | Pay a little more by 15 May to keep your account active. |
 | `at_minimum` | `amount` snaps to minimum | Minimum payment | Pay this by 15 May to keep your account active. Pay more to reduce your interest charges. |
 | `between_min_due` | `minimumPayment < amount < dueBalance` | Partial payment | Pay this by 15 May to cover more of your April balance and reduce your interest charges. |
-| `at_due` (default) | `amount` snaps to due | [Month] balance | Pay this by 15 May to cover your April balance and avoid any interest. |
-| `at_due` (revolver, due = total) | revolver, `due = total`, `min ≠ due` | Total balance | Pay this to clear your balance and stop interest from accruing. |
+| `at_due` (default) | `amount` snaps to due | [Month] payment | Pay this by 15 May to cover your April balance and avoid any interest. |
+| `at_due` (revolver, due = total) | revolver, `due = total`, `min ≠ due` | Total payment | Pay this to clear your balance and stop interest from accruing. |
 | `between_due_total` | `dueBalance < amount < totalBalance` | Early payment | Pay this to free up available credit and reduce next month's bill. |
-| `at_total` | `amount` snaps to total, `total > due` | Total balance | Pay this to clear your full balance and stay ahead on your finances. |
+| `at_total` | `amount` snaps to total, `total > due` | Total payment | Pay this to clear your full balance and stay ahead on your finances. |
 
 **Variables**
 - `[Month]` — the bill's month name, derived from the 16th→15th billing cycle (e.g. "April" while in the Apr 16–May 15 period).

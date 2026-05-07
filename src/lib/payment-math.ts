@@ -170,7 +170,7 @@ export function getZoneInfo(zone: PaymentZone, opts?: ZoneInfoOpts): ZoneInfo {
       if (dueEqualsTotal && !minEqualsDue && userType === 'revolver') {
         return {
           zone,
-          title: 'Total balance',
+          title: 'Total payment',
           description: 'Pay this to clear your balance and stop interest from accruing.',
         };
       }
@@ -180,7 +180,7 @@ export function getZoneInfo(zone: PaymentZone, opts?: ZoneInfoOpts): ZoneInfo {
       //   • small balance (min = due, with or without due = total)
       return {
         zone,
-        title: `${dueMonth} balance`,
+        title: `${dueMonth} payment`,
         description: `Pay this by ${dueDate} to cover your ${dueMonth} balance and avoid any interest.`,
       };
     }
@@ -195,7 +195,7 @@ export function getZoneInfo(zone: PaymentZone, opts?: ZoneInfoOpts): ZoneInfo {
     case 'at_total':
       return {
         zone,
-        title: 'Total balance',
+        title: 'Total payment',
         description: 'Pay this to clear your full balance and stay ahead on your finances.',
       };
   }
