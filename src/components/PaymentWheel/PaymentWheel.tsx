@@ -1,6 +1,8 @@
 'use client';
 
+import { useState } from 'react';
 import { WheelSVG } from './WheelSVG';
+import { StagesDrawer } from './StagesDrawer';
 import { PaymentStateReturn } from '@/hooks/usePaymentState';
 import { COLORS } from '@/lib/constants';
 import { formatDueDateShort } from '@/lib/payment-math';
@@ -17,7 +19,6 @@ export function PaymentWheel({ state, onPay }: PaymentWheelProps) {
     selectedAmount,
     setAmount,
     minimumPayment,
-    zone,
     zoneInfo,
     showInterest,
     interestProjection,
@@ -25,73 +26,67 @@ export function PaymentWheel({ state, onPay }: PaymentWheelProps) {
     canPay,
   } = state;
 
-  const dueMonth = formatDueDateShort();
-  const isAtZero = selectedAmount <= 0;
+  const dueDate = formatDueDateShort(); // "15 May"
+  const dueMonthName = dueDate.split(' ')[1]; // "May"
   const isRevolver = accountState.userType === 'revolver';
 
-  // Title logic: at 0 show default, otherwise show zone title
-  const title = isAtZero || isZeroBalance
-    ? 'Choose amount'
-    : accountState.isCardBlocked
-    ? 'Card blocked'
-    : zoneInfo.title;
-
-  // Subtitle logic: at 0 show due date, otherwise show zone description
-  const subtitle = isAtZero || isZeroBalance
-    ? `Pay by 11:59PM on ${dueMonth}`
-    : accountState.isCardBlocked
-    ? 'Pay the minimum amount to unblock your card and restore access.'
-    : zoneInfo.description;
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   return (
-    <div className="w-full max-w-md mx-auto">
-
-      {/* 1. Title + subtitle (fused) */}
-      <div className="text-center px-5 relative">
+    <div className="w-full max-w-md mx-auto flex flex-col">
+      {/* Top bar — back button (left) + static title (centered) */}
+      <div className="relative px-5 pt-2 pb-3">
         <button
-          className="absolute top-0 right-5 w-8 h-8 flex items-center justify-center rounded-full"
-          style={{ color: COLORS.textSecondary }}
+          aria-label="Back"
+          className="absolute left-5 top-2 w-10 h-10 flex items-center justify-center rounded-2xl"
+          style={{
+            background: '#ffffff',
+            boxShadow: '0 1px 2px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.04)',
+          }}
         >
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-            <path d="M5 5l10 10M15 5L5 15" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+            <path
+              d="M11 3L5 9l6 6"
+              stroke={COLORS.textPrimary}
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
           </svg>
         </button>
 
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={isAtZero ? 'default' : accountState.isCardBlocked ? 'blocked' : zone}
-            initial={{ opacity: 0, y: 4 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -4 }}
-            transition={{ duration: 0.15 }}
+        <div className="text-center px-12">
+          <h1
+            className="text-xl font-bold"
+            style={{ color: COLORS.textPrimary }}
           >
-            <h1
-              className="text-xl font-bold"
-              style={{ color: accountState.isCardBlocked && !isAtZero ? COLORS.textDanger : COLORS.textPrimary }}
-            >
-              {title}
-            </h1>
-            <p className="text-xs mt-1 leading-relaxed" style={{ color: COLORS.textSecondary }}>
-              {subtitle}
-            </p>
-          </motion.div>
-        </AnimatePresence>
+            Credit card repayment
+          </h1>
+          <p
+            className="text-sm mt-1"
+            style={{ color: COLORS.textSecondary }}
+          >
+            Pay by 11:59PM {dueDate}
+          </p>
+        </div>
       </div>
 
-      {/* 2. Wheel */}
-      <div className="mt-2">
+      {/* Wheel */}
+      <div className="mt-4">
         <WheelSVG
           accountState={accountState}
           selectedAmount={selectedAmount}
           minimumPayment={minimumPayment}
           isZeroBalance={isZeroBalance}
+          zoneInfo={zoneInfo}
           onAmountChange={setAmount}
+          onInfoClick={() => setDrawerOpen(true)}
         />
       </div>
 
-      {/* 3. Interest projection — under wheel */}
-      {canPay && !isZeroBalance && (
-        <div className="px-5">
+      {/* Interest projection */}
+      {canPay && !isZeroBalance && !accountState.isCardBlocked && (
+        <div className="px-5 mt-6">
           <AnimatePresence mode="wait">
             <motion.div
               key={showInterest ? 'interest' : 'no-interest'}
@@ -100,43 +95,49 @@ export function PaymentWheel({ state, onPay }: PaymentWheelProps) {
               exit={{ opacity: 0, y: -4 }}
               transition={{ duration: 0.15 }}
             >
-              <div className="text-xs tabular-nums text-center" style={{ color: COLORS.textSecondary }}>
+              <div
+                className="text-sm font-semibold tabular-nums text-center"
+                style={{ color: COLORS.textPrimary }}
+              >
                 {showInterest && interestProjection > 0
                   ? isRevolver
                     ? `Interest projection: €${interestProjection.toFixed(2)} over next 30 days`
-                    : `Interest projection: €${interestProjection.toFixed(2)} on 16 ${dueMonth.split(' ')[1]}`
-                  : 'No interest charges'
-                }
+                    : `Interest projection: €${interestProjection.toFixed(2)} on 16 ${dueMonthName}`
+                  : 'No interest charges'}
               </div>
             </motion.div>
           </AnimatePresence>
         </div>
       )}
 
-      {/* 4. Pay button */}
+      {/* Pay button + Other amount */}
       {canPay && (
-        <div className="mt-2 px-5">
+        <div className="mt-8 px-5">
           <motion.button
-            className="w-full py-3.5 rounded-xl text-base font-semibold"
-            style={{
-              background: '#1a1a2e',
-              color: '#fff',
-            }}
+            className="w-full py-4 rounded-2xl text-base font-semibold"
+            style={{ background: '#1a1a2e', color: '#fff' }}
             whileTap={{ scale: 0.97 }}
             onClick={onPay}
           >
             Pay €{selectedAmount.toFixed(2)}
           </motion.button>
 
-          {/* 5. Other amount */}
           <button
-            className="w-full text-center mt-3 text-sm font-medium"
-            style={{ color: COLORS.textSecondary }}
+            className="w-full text-center mt-3 text-sm font-semibold"
+            style={{ color: COLORS.textPrimary }}
           >
             Other amount
           </button>
         </div>
       )}
+
+      {/* Stage descriptions drawer */}
+      <StagesDrawer
+        isOpen={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        accountState={accountState}
+        minimumPayment={minimumPayment}
+      />
     </div>
   );
 }

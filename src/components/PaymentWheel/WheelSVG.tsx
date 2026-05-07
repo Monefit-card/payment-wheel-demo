@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef, useCallback, useMemo } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { WHEEL, COLORS } from '@/lib/constants';
 import {
   getFullTrackPath,
@@ -14,7 +15,7 @@ import {
   describeArc,
 } from '@/lib/arc-geometry';
 import { useHaptic } from '@/hooks/useHaptic';
-import { AccountState } from '@/types/payment';
+import { AccountState, ZoneInfo } from '@/types/payment';
 
 const DOT_R = 7;
 const STEP_COUNT = 100;
@@ -24,7 +25,9 @@ interface WheelSVGProps {
   selectedAmount: number;
   minimumPayment: number;
   isZeroBalance: boolean;
+  zoneInfo: ZoneInfo;
   onAmountChange: (amount: number) => void;
+  onInfoClick?: () => void;
 }
 
 export function WheelSVG({
@@ -32,7 +35,9 @@ export function WheelSVG({
   selectedAmount,
   minimumPayment,
   isZeroBalance,
+  zoneInfo,
   onAmountChange,
+  onInfoClick,
 }: WheelSVGProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const isDragging = useRef(false);
@@ -266,26 +271,83 @@ export function WheelSVG({
         )}
       </svg>
 
-      {/* Center display: balance label + selected amount */}
+      {/* Center display: stage title + selected amount + total balance */}
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
         <div className="text-center">
           {isZeroBalance ? (
             <div className="text-lg font-semibold" style={{ color: COLORS.textNoInterest }}>
               All clear
             </div>
-          ) : (
+          ) : isCardBlocked ? (
             <>
               <div
-                className="text-4xl font-bold tabular-nums"
+                className="text-base font-semibold"
+                style={{ color: COLORS.textDanger }}
+              >
+                Card blocked
+              </div>
+              <div
+                className="text-[11px] mt-1 leading-snug px-6"
+                style={{ color: COLORS.textSecondary }}
+              >
+                Pay the minimum amount to unblock your card.
+              </div>
+            </>
+          ) : (
+            <>
+              {/* Stage title (changes with drag) */}
+              <AnimatePresence mode="wait">
+                <motion.button
+                  key={zoneInfo.zone}
+                  type="button"
+                  onClick={onInfoClick}
+                  className="inline-flex items-center justify-center gap-1 pointer-events-auto"
+                  initial={{ opacity: 0, y: 2 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -2 }}
+                  transition={{ duration: 0.15 }}
+                  style={{ color: COLORS.textSecondary }}
+                >
+                  <span className="text-xs font-medium">{zoneInfo.title}</span>
+                  <svg
+                    width="13"
+                    height="13"
+                    viewBox="0 0 13 13"
+                    fill="none"
+                    aria-hidden="true"
+                  >
+                    <circle
+                      cx="6.5"
+                      cy="6.5"
+                      r="5.75"
+                      stroke="currentColor"
+                      strokeWidth="1"
+                    />
+                    <circle cx="6.5" cy="3.6" r="0.75" fill="currentColor" />
+                    <path
+                      d="M6.5 5.6v4.2"
+                      stroke="currentColor"
+                      strokeWidth="1.2"
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                </motion.button>
+              </AnimatePresence>
+
+              {/* Selected amount */}
+              <div
+                className="text-4xl font-bold tabular-nums mt-1"
                 style={{ color: COLORS.textPrimary }}
               >
                 €{selectedAmount.toFixed(2)}
               </div>
+
+              {/* Total balance */}
               <div
-                className="text-[10px] mt-1 tabular-nums"
-                style={{ color: COLORS.textMuted }}
+                className="text-[11px] mt-1 tabular-nums"
+                style={{ color: COLORS.textSecondary }}
               >
-                of €{totalBalance.toFixed(2)}
+                Total balance: €{totalBalance.toFixed(2)}
               </div>
             </>
           )}
