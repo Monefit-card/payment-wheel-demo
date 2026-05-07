@@ -34,7 +34,7 @@ export function PaymentWheel({ state, onPay }: PaymentWheelProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   return (
-    <div className="w-full max-w-md mx-auto flex flex-col">
+    <div className="w-full max-w-md mx-auto flex flex-col flex-1">
       {/* Top bar — back button (left) + static title (centered) */}
       <div className="relative px-5 pt-2 pb-3">
         <button
@@ -111,9 +111,9 @@ export function PaymentWheel({ state, onPay }: PaymentWheelProps) {
         </div>
       )}
 
-      {/* Pay button + Other amount */}
+      {/* Pay button + Other amount — pinned to bottom */}
       {canPay && (
-        <div className="mt-8 px-5">
+        <div className="mt-auto pt-8 px-5">
           <motion.button
             className="w-full py-4 rounded-2xl text-base font-semibold"
             style={{ background: '#1a1a2e', color: '#fff' }}
