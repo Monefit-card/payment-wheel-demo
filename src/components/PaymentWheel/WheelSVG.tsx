@@ -201,7 +201,7 @@ export function WheelSVG({
   );
 
   return (
-    <div className="relative w-full max-w-[280px] mx-auto aspect-square select-none touch-none">
+    <div className="relative w-full max-w-[340px] mx-auto aspect-square select-none touch-none">
       <svg
         ref={svgRef}
         viewBox={WHEEL.viewBox}
@@ -308,10 +308,10 @@ export function WheelSVG({
                   transition={{ duration: 0.15 }}
                   style={{ color: COLORS.textSecondary }}
                 >
-                  <span className="text-xs font-medium">{zoneInfo.title}</span>
+                  <span className="text-sm font-medium">{zoneInfo.title}</span>
                   <svg
-                    width="13"
-                    height="13"
+                    width="14"
+                    height="14"
                     viewBox="0 0 13 13"
                     fill="none"
                     aria-hidden="true"
@@ -336,7 +336,7 @@ export function WheelSVG({
 
               {/* Selected amount */}
               <div
-                className="text-4xl font-bold tabular-nums mt-1"
+                className="text-5xl font-bold tabular-nums mt-1.5"
                 style={{ color: COLORS.textPrimary }}
               >
                 €{selectedAmount.toFixed(2)}
@@ -344,7 +344,7 @@ export function WheelSVG({
 
               {/* Total balance */}
               <div
-                className="text-[11px] mt-1 tabular-nums"
+                className="text-xs mt-1.5 tabular-nums"
                 style={{ color: COLORS.textSecondary }}
               >
                 Total balance: €{totalBalance.toFixed(2)}

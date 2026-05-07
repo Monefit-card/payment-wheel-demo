@@ -72,7 +72,7 @@ export function PaymentWheel({ state, onPay }: PaymentWheelProps) {
       </div>
 
       {/* Wheel */}
-      <div className="mt-4">
+      <div className="mt-8 px-4">
         <WheelSVG
           accountState={accountState}
           selectedAmount={selectedAmount}
@@ -131,12 +131,11 @@ export function PaymentWheel({ state, onPay }: PaymentWheelProps) {
         </div>
       )}
 
-      {/* Stage descriptions drawer */}
+      {/* Current-stage description drawer */}
       <StagesDrawer
         isOpen={drawerOpen}
         onClose={() => setDrawerOpen(false)}
-        accountState={accountState}
-        minimumPayment={minimumPayment}
+        zoneInfo={zoneInfo}
       />
     </div>
   );

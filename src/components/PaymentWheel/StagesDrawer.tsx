@@ -2,78 +2,15 @@
 
 import { motion, AnimatePresence } from 'motion/react';
 import { COLORS } from '@/lib/constants';
-import { getZoneInfo } from '@/lib/payment-math';
-import { AccountState, PaymentZone, ZoneInfo } from '@/types/payment';
+import { ZoneInfo } from '@/types/payment';
 
 interface StagesDrawerProps {
   isOpen: boolean;
   onClose: () => void;
-  accountState: AccountState;
-  minimumPayment: number;
+  zoneInfo: ZoneInfo;
 }
 
-/** All zones the user could land on for the given account state. Mirrors the
- *  routing in `getPaymentZone` so the drawer reads as the wheel's legend. */
-function getActiveZones(
-  accountState: AccountState,
-  minimumPayment: number,
-): PaymentZone[] {
-  const { totalBalance, dueBalance } = accountState;
-  if (totalBalance <= 0) return ['at_zero'];
-
-  const minIsDue =
-    minimumPayment > 0 &&
-    dueBalance > 0 &&
-    Math.abs(minimumPayment - dueBalance) < totalBalance * 0.02;
-  const dueIsTotal =
-    dueBalance > 0 &&
-    Math.abs(dueBalance - totalBalance) < totalBalance * 0.02;
-
-  const zones: PaymentZone[] = [];
-
-  // Below the bill
-  if (dueBalance > 0) {
-    if (minimumPayment > 0 && !minIsDue) {
-      zones.push('below_minimum', 'at_minimum', 'between_min_due');
-    } else if (minIsDue) {
-      zones.push('below_minimum');
-    }
-    zones.push('at_due');
-  }
-
-  // Above the bill
-  if (!dueIsTotal && totalBalance > dueBalance) {
-    if (dueBalance > 0) zones.push('between_due_total');
-    zones.push('at_total');
-  }
-
-  return zones;
-}
-
-export function StagesDrawer({
-  isOpen,
-  onClose,
-  accountState,
-  minimumPayment,
-}: StagesDrawerProps) {
-  const zones = getActiveZones(accountState, minimumPayment);
-
-  const dueEqualsTotal =
-    accountState.totalBalance > 0 &&
-    Math.abs(accountState.dueBalance - accountState.totalBalance) < 0.01;
-  const minEqualsDue =
-    accountState.totalBalance > 0 &&
-    minimumPayment > 0 &&
-    Math.abs(minimumPayment - accountState.dueBalance) < 0.01;
-
-  const items: ZoneInfo[] = zones.map((z) =>
-    getZoneInfo(z, {
-      dueEqualsTotal,
-      minEqualsDue,
-      userType: accountState.userType,
-    }),
-  );
-
+export function StagesDrawer({ isOpen, onClose, zoneInfo }: StagesDrawerProps) {
   return (
     <AnimatePresence>
       {isOpen && (
@@ -112,7 +49,7 @@ export function StagesDrawer({
                 className="text-base font-bold"
                 style={{ color: COLORS.textPrimary }}
               >
-                Payment stages
+                {zoneInfo.title}
               </h2>
               <button
                 onClick={onClose}
@@ -130,24 +67,14 @@ export function StagesDrawer({
               </button>
             </div>
 
-            {/* Stage list */}
-            <div className="px-5 pb-8 pt-1 space-y-4">
-              {items.map((item) => (
-                <div key={item.zone}>
-                  <div
-                    className="text-sm font-semibold"
-                    style={{ color: COLORS.textPrimary }}
-                  >
-                    {item.title}
-                  </div>
-                  <div
-                    className="text-xs mt-0.5 leading-relaxed"
-                    style={{ color: COLORS.textSecondary }}
-                  >
-                    {item.description}
-                  </div>
-                </div>
-              ))}
+            {/* Body */}
+            <div className="px-5 pb-8 pt-1">
+              <p
+                className="text-sm leading-relaxed"
+                style={{ color: COLORS.textSecondary }}
+              >
+                {zoneInfo.description}
+              </p>
             </div>
           </motion.div>
         </>
