@@ -46,3 +46,65 @@ html {
 .touch-none {
   touch-action: none;
 }
+
+/* Scrollable panes inside the phone frame — scroll, but never show a bar */
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Flex term slider — grey rail, dark fill to the knob, large white thumb. */
+.term-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 28px;
+  background: transparent;
+}
+
+.term-slider::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 3px;
+  background: linear-gradient(
+    to right,
+    #131417 0,
+    #131417 var(--fill),
+    #e6e6ea var(--fill),
+    #e6e6ea 100%
+  );
+}
+
+.term-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 28px;
+  height: 28px;
+  margin-top: -11px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(19, 20, 23, 0.2), 0 3px 10px rgba(19, 20, 23, 0.12);
+}
+
+.term-slider::-moz-range-track {
+  height: 6px;
+  border-radius: 3px;
+  background: #e6e6ea;
+}
+
+.term-slider::-moz-range-progress {
+  height: 6px;
+  border-radius: 3px;
+  background: #131417;
+}
+
+.term-slider::-moz-range-thumb {
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(19, 20, 23, 0.2), 0 3px 10px rgba(19, 20, 23, 0.12);
+}

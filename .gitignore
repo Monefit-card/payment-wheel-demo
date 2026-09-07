@@ -39,3 +39,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# scratch — downloaded gh CLI tarball, not part of the app
+/.tmp-gh/

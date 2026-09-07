@@ -1,17 +1,47 @@
 'use client';
 
-import { useState } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { useCallback, useMemo, useState } from 'react';
+import { motion } from 'motion/react';
 import { PaymentWheel } from '@/components/PaymentWheel/PaymentWheel';
 import { AdminPanel } from '@/components/AdminPanel/AdminPanel';
 import { PaymentConfirmation } from '@/components/Confirmation/PaymentConfirmation';
+import { HomeScreen } from '@/components/Home/HomeScreen';
+import { BillsScreen } from '@/components/Bills/BillsScreen';
+import { FlexFlow } from '@/components/Flex/FlexFlow';
+import { FlexTransactionsPage } from '@/components/Flex/FlexTransactionsPage';
+import { FlexIntroStory } from '@/components/Flex/FlexIntroStory';
+import { useAppState } from '@/hooks/useAppState';
 import { usePaymentState } from '@/hooks/usePaymentState';
+import { flexedTxnIds } from '@/lib/flex-math';
 
-type Screen = 'wheel' | 'confirm';
+/**
+ * `home` and `bills` are TABS — peers at the same depth. `wheel` and `confirm`
+ * sit deeper, pushed on top of whichever tab launched them.
+ */
+type Screen = 'home' | 'bills' | 'wheel' | 'confirm';
+
+/** Which repayment wheel to render — see the note in `Home`. */
+export type WheelVariant = 'with-settlement' | 'card-only';
+
+/** Navigation depth. Tabs share depth 0, so a tab switch is never a push. */
+const SCREEN_DEPTH: Record<Screen, number> = {
+  home: 0,
+  bills: 0,
+  wheel: 1,
+  confirm: 2,
+};
+
+/** Which Flex surface, if any, is stacked over the current screen. */
+type FlexFlowState = { mode: 'create' | 'manage'; initialTxnId?: string } | null;
+
+const HOME_BACKGROUND =
+  'linear-gradient(180deg, #e4e4e9 0%, #f3f3f6 24%, #eef0f3 62%, #e8ebef 100%)';
 
 function StatusBar() {
   return (
-    <div className="relative h-11 flex items-center justify-between px-7 select-none">
+    // z-[60] keeps the clock and indicators legible above a sheet's dimming
+    // backdrop, which deliberately overshoots up into this strip.
+    <div className="relative z-[60] h-11 flex items-center justify-between px-7 select-none">
       <span
         className="text-[15px] font-semibold tabular-nums"
         style={{ color: '#1a1a2e' }}
@@ -75,64 +105,254 @@ function StatusBar() {
 }
 
 export default function Home() {
-  const paymentState = usePaymentState();
-  const [screen, setScreen] = useState<Screen>('wheel');
+  const app = useAppState();
+  /**
+   * Two wheels to compare.
+   *
+   * 'with-settlement' is the full model: future instalments extend the ring
+   * into a settlement step, the balance line reports the account total, the
+   * top of the card range is called "Card payment", the minimum carries a
+   * second anchor splitting the credit-line minimum from the due instalments
+   * stacked on top of it, and the stretch above the card balance pays down the
+   * future instalments.
+   *
+   * 'card-only' hides future instalments from the wheel entirely. Feeding the
+   * three Flex figures in as zero covers most of that — the settlement
+   * segment, the Flex interest box, the "Total balance" label and the "Card
+   * payment" naming all key off them. Due instalments stay inside the minimum
+   * either way; only variant 1 shows where they begin.
+   */
+  const [wheelVariant, setWheelVariant] = useState<WheelVariant>('with-settlement');
+  const cardOnly = wheelVariant === 'card-only';
+
+  const paymentState = usePaymentState({
+    accountState: app.account,
+    flexDueAmount: app.summary.flexDue,
+    flexFutureAmount: cardOnly ? 0 : app.summary.flexFuture,
+    flexSettlementAmount: cardOnly ? 0 : app.summary.flexSettlement,
+    flexInterestSaved: cardOnly ? 0 : app.summary.flexInterestSaved,
+    splitMinimum: !cardOnly,
+    flexPlans: cardOnly ? [] : app.scenario.flexPlans,
+    onAccountStateChange: app.overrideAccount,
+  });
+
+  const [screen, setScreen] = useState<Screen>('home');
+  // Which way the next transition slides: forward pushes in from the right.
+  const [direction, setDirection] = useState(1);
+  // A lateral tab move (home <-> bills) cross-fades instead of sliding: a push
+  // animation would imply depth that a tab switch doesn't have.
+  const [isTabMove, setIsTabMove] = useState(false);
+
+  const [flexFlow, setFlexFlow] = useState<FlexFlowState>(null);
+  const [txnsOpen, setTxnsOpen] = useState(false);
+  const [introOpen, setIntroOpen] = useState(false);
+  /**
+   * Set when the intro is shown in place of the Flex flow the user actually
+   * asked for, so finishing the story lands them where they were headed.
+   */
+  const [pendingFlexTxnId, setPendingFlexTxnId] = useState<string | null>(null);
+
+  const go = useCallback(
+    (next: Screen) => {
+      const tabMove = SCREEN_DEPTH[next] === 0 && SCREEN_DEPTH[screen] === 0;
+      setIsTabMove(tabMove);
+      if (!tabMove) setDirection(SCREEN_DEPTH[next] > SCREEN_DEPTH[screen] ? 1 : -1);
+      setScreen(next);
+    },
+    [screen],
+  );
+
+  /* ── Flex ──────────────────────────────────────────────────────────────── */
+
+  const flexedIds = useMemo(
+    () => flexedTxnIds(app.scenario.flexPlans),
+    [app.scenario.flexPlans],
+  );
+
+  /** Flex-eligible transactions that aren't already on an active plan. */
+  const eligibleTxns = useMemo(
+    () => app.scenario.transactions.filter((t) => t.flexEligible && !flexedIds.has(t.id)),
+    [app.scenario.transactions, flexedIds],
+  );
+
+  const hasPlans = app.scenario.flexPlans.length > 0;
+
+  /**
+   * Every route into Flex. A first-time user gets the story first — including
+   * when they tapped a specific transaction's chip, which is remembered and
+   * reopened once the story is done.
+   */
+  const openFlex = useCallback(
+    (txnId?: string) => {
+      if (!app.flexIntroSeen) {
+        setPendingFlexTxnId(txnId ?? null);
+        setIntroOpen(true);
+        return;
+      }
+      if (txnId) {
+        setFlexFlow({ mode: 'create', initialTxnId: txnId });
+        return;
+      }
+      setFlexFlow({ mode: hasPlans ? 'manage' : 'create' });
+    },
+    [app.flexIntroSeen, hasPlans],
+  );
+
+  const finishIntro = useCallback(() => {
+    setIntroOpen(false);
+    app.markFlexIntroSeen();
+    setFlexFlow(
+      pendingFlexTxnId
+        ? { mode: 'create', initialTxnId: pendingFlexTxnId }
+        : { mode: hasPlans ? 'manage' : 'create' },
+    );
+    setPendingFlexTxnId(null);
+  }, [app, hasPlans, pendingFlexTxnId]);
+
+  /** From the transactions page: close it, then open the picker on that txn. */
+  const flexFromTxnsPage = useCallback(
+    (txnId: string) => {
+      setTxnsOpen(false);
+      openFlex(txnId);
+    },
+    [openFlex],
+  );
+
+  const confirmPayment = useCallback(() => {
+    app.applyPayment(paymentState.selectedAmount);
+    go('home');
+  }, [app, paymentState.selectedAmount, go]);
+
+  const isHome = screen === 'home' || screen === 'bills';
 
   return (
     <main
       className="min-h-dvh flex flex-col items-center justify-start py-6 px-4"
-      style={{ background: '#f5f5f7' }}
+      style={{ background: '#e8e8ed' }}
     >
       <div
-        className="w-full max-w-[390px] rounded-[44px] overflow-hidden flex flex-col"
+        className="relative w-full max-w-[390px] rounded-[44px] overflow-hidden flex flex-col"
         style={{
-          background: '#ffffff',
-          minHeight: '780px',
+          // Wheel and confirm screens sit on the design's light grey; home
+          // paints its own tinted backdrop over this.
+          background: '#f2f2f4',
+          // A fixed device viewport (iPhone 390x844) rather than a min-height,
+          // so long screens scroll inside the frame instead of stretching it.
+          height: '844px',
           boxShadow:
             '0 1px 3px rgba(0,0,0,0.08), 0 12px 32px rgba(0,0,0,0.06)',
         }}
       >
-        <StatusBar />
+        {/* Home's tinted backdrop cross-fades with the screen transition so the
+            outgoing screen never flashes against the wrong background. Plain CSS
+            rather than motion: the inline opacity is always the correct resting
+            value, so the backdrop can't be left mid-fade. Bills is a tab peer of
+            home and shares it. */}
+        <div
+          className="absolute inset-0 transition-opacity duration-200"
+          style={{ background: HOME_BACKGROUND, opacity: isHome ? 1 : 0 }}
+        />
 
-        <div className="flex-1 flex flex-col pb-8">
-          <AnimatePresence mode="popLayout" initial={false}>
-            {screen === 'wheel' ? (
-              <motion.div
-                key="wheel"
-                className="flex-1 flex flex-col"
-                initial={{ x: '-24px', opacity: 0 }}
-                animate={{ x: 0, opacity: 1 }}
-                exit={{ x: '-24px', opacity: 0 }}
-                transition={{ duration: 0.22, ease: [0.32, 0, 0.67, 0] }}
-              >
+        <div className="relative z-10 flex flex-col flex-1 min-h-0">
+          <StatusBar />
+
+          <div className="flex-1 flex flex-col min-h-0">
+            {/* The keyed screen remounts on navigation and slides in (or fades,
+                between tabs). There is deliberately no exit animation: a screen
+                transition must never wait on the outgoing screen to finish
+                animating, or a dropped frame callback (backgrounded tab) leaves
+                navigation stuck. */}
+            <motion.div
+              key={screen}
+              className={`flex-1 flex flex-col min-h-0 ${
+                screen === 'confirm' ? 'pt-2' : ''
+              }`}
+              initial={{ x: isTabMove ? 0 : direction * 24, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              transition={{
+                duration: isTabMove ? 0.16 : 0.22,
+                ease: [0.33, 1, 0.68, 1],
+              }}
+            >
+              {screen === 'home' && (
+                <HomeScreen
+                  scenario={app.scenario}
+                  summary={app.summary}
+                  onPay={() => go('wheel')}
+                  onNavigateBills={() => go('bills')}
+                  onOpenFlex={() => openFlex()}
+                  onOpenTransactions={() => setTxnsOpen(true)}
+                  onFlexTxn={openFlex}
+                />
+              )}
+
+              {screen === 'bills' && (
+                <BillsScreen
+                  scenario={app.scenario}
+                  summary={app.summary}
+                  onPay={() => go('wheel')}
+                  onNavigateHome={() => go('home')}
+                />
+              )}
+
+              {screen === 'wheel' && (
                 <PaymentWheel
                   state={paymentState}
-                  onPay={() => setScreen('confirm')}
+                  onBack={() => go('home')}
+                  onPay={() => go('confirm')}
+                  onOpenFlex={() => openFlex()}
                 />
-              </motion.div>
-            ) : (
-              <motion.div
-                key="confirm"
-                className="flex-1 flex flex-col pt-2"
-                initial={{ x: '24px', opacity: 0 }}
-                animate={{ x: 0, opacity: 1 }}
-                exit={{ x: '24px', opacity: 0 }}
-                transition={{ duration: 0.22, ease: [0.32, 0, 0.67, 0] }}
-              >
+              )}
+
+              {screen === 'confirm' && (
                 <PaymentConfirmation
                   amount={paymentState.selectedAmount}
-                  onBack={() => setScreen('wheel')}
+                  onBack={() => go('wheel')}
+                  onConfirm={confirmPayment}
                 />
-              </motion.div>
-            )}
-          </AnimatePresence>
+              )}
+            </motion.div>
+          </div>
         </div>
+
+        {/* Overlays. Each is `absolute inset-0` inside the phone frame (never
+            fixed), so they cover the status bar and paint their own top
+            padding, exactly like FullScreenOverlay. */}
+        {txnsOpen && (
+          <FlexTransactionsPage
+            txns={app.scenario.transactions}
+            eligibleIds={new Set(eligibleTxns.map((t) => t.id))}
+            flexedIds={flexedIds}
+            onFlex={flexFromTxnsPage}
+            onBack={() => setTxnsOpen(false)}
+          />
+        )}
+
+        {flexFlow && (
+          <FlexFlow
+            mode={flexFlow.mode}
+            initialTxnId={flexFlow.initialTxnId}
+            plans={app.scenario.flexPlans}
+            history={app.scenario.flexHistory}
+            eligibleTxns={eligibleTxns}
+            onCreate={({ txnIds, n }) => app.createFlexPlan({ txnIds, n })}
+            onCancelPlan={app.cancelFlexPlan}
+            onPayoffInstalments={app.payoffInstalments}
+            accountBlocked={app.scenario.accountBlocked}
+            minimumPaid={app.summary.currentBill.minPaid === true}
+            onClose={() => setFlexFlow(null)}
+          />
+        )}
+
+        {introOpen && <FlexIntroStory onDone={finishIntro} />}
       </div>
 
       <AdminPanel
-        accountState={paymentState.accountState}
-        onAccountStateChange={paymentState.setAccountState}
+        app={app}
+        wheelMinimum={paymentState.minimumPayment}
         onApplyPreset={paymentState.applyPreset}
+        wheelVariant={wheelVariant}
+        onWheelVariantChange={setWheelVariant}
       />
     </main>
   );

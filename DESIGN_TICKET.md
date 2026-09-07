@@ -34,19 +34,23 @@ Every account configuration the wheel renders in. Names match the demo's preset 
 | # | Scenario | Active zones |
 |---|---|---|
 | 1 | Transactor — Standard | `below_minimum` · `at_minimum` · `between_min_due` · `at_due` · `between_due_total` · `at_total` |
-| 2 | Transactor — Standard (Small balance) | `below_minimum` · `at_due` · `between_due_total` · `at_total` |
-| 3 | Transactor — Due = Total | `below_minimum` · `at_minimum` · `between_min_due` · `at_due` |
-| 4 | Transactor — Due = Total (Small balance) | `below_minimum` · `at_due` |
-| 5 | Transactor — Outside period | `between_due_total` · `at_total` |
-| 6 | Transactor — Outside period (Small balance) | `between_due_total` · `at_total` |
-| 7 | Revolver — Standard | `below_minimum` · `at_minimum` · `between_min_due` · `at_due` |
-| 8 | Revolver — Standard (Small balance) | `below_minimum` · `at_due` |
-| 9 | Revolver — Outside period | `between_min_due` · `at_due` |
-| 10 | Revolver — Outside period (Small balance) | `between_min_due` · `at_due` |
-| 11 | Zero balance | `at_zero` |
-| 12 | Card blocked | (special design — title and subtitle lock to "Card blocked" / unblock copy across all zones, arc turns red) |
+| 2 | Transactor — All six stages | as #1, with balances small enough that every zone is reachable by drag |
+| 3 | Transactor — Standard (Small balance) | `below_minimum` · `at_due` · `between_due_total` · `at_total` |
+| 4 | Transactor — Due = Total | `below_minimum` · `at_minimum` · `between_min_due` · `at_due` |
+| 5 | Transactor — Due = Total (Small balance) | `below_minimum` · `at_due` |
+| 6 | Transactor — Outside period | `between_due_total` · `at_total` |
+| 7 | Transactor — Outside period (Small balance) | `between_due_total` · `at_total` |
+| 8 | Revolver — Standard | `below_minimum` · `at_minimum` · `between_min_due` · `at_due` |
+| 9 | Revolver — Standard (Small balance) | `below_minimum` · `at_due` |
+| 10 | Revolver — Outside period | `between_min_due` · `at_due` |
+| 11 | Revolver — Outside period (Small balance) | `between_min_due` · `at_due` |
+| 12 | Zero balance | `at_zero` |
+| 13 | Card blocked | (special design — title and subtitle lock to "Card blocked" / unblock copy across all zones, arc turns red) |
 
 **Notes**
+- The minimum is 5% of the bill with a €20 floor. On a large balance that floor
+  lands inside the wheel's snap window, so `below_minimum` isn't reachable by
+  drag — preset #2 exists to demo that zone.
 - "Small balance" means owes ≤ €20 — at this size the minimum payment is the full bill, so the minimum and due anchors collapse into one.
 - "Due = Total" means there's no balance carried forward beyond this period's bill — the due and total anchors collapse into one.
 - When both happen (small balance + due = total), all three anchors collapse into a single point at the top of the wheel.
@@ -130,3 +134,34 @@ Triggered by tapping "Add new" in edit mode. Opens a bottom sheet.
 - Account must always have at least one active payment method.
 - Wallets cannot be linked twice — the add sheet greys out wallets already in the list.
 - Cards have no duplicate check (different cards, even from the same provider, are independent entries).
+
+---
+
+## 5. Wheel visuals
+
+The arc is a full 360° ring starting at 12 o'clock, filling clockwise from €0 to
+the total balance.
+
+| Token | Value |
+|---|---|
+| Ring outer diameter | 84% of screen width (308 of the 320 viewBox) |
+| Stroke | 15% of the outer diameter, round caps |
+| Track | white, on the `#f2f2f4` screen |
+| Anchors | 8.5r dots at minimum / bill / total — black at 24% where the arc has reached them, `#c4c4ca` where it hasn't |
+| Handle | 20r disc in the stage's pale tint, rimmed in the stage's end colour |
+
+Each stage draws a two-stop gradient along the arc, from the ring's start point
+toward the handle:
+
+| Stage | From | To | Handle |
+|---|---|---|---|
+| `below_minimum` | `#fa1e0a` | `#ff6b2e` | `#ffd3c4` |
+| `at_minimum` | `#f4571a` | `#fba33f` | `#fbe7d0` |
+| `between_min_due` | `#fa9a2e` | `#ffe81a` | `#fdf6be` |
+| `at_due` | `#a8e82a` | `#22d94f` | `#cff5db` |
+| `between_due_total` | `#31c9f2` | `#2081d6` | `#cae8fa` |
+| `at_total` | `#22bfef` | `#1477d2` | `#cdebf8` |
+
+Tapping the stage title opens the explainer sheet: dimmed and blurred backdrop,
+centred title with a circled close control, centred body copy from §3's
+long-form column, and a black **Ok** button.

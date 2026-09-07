@@ -40,9 +40,14 @@ function LockIcon() {
 interface PaymentConfirmationProps {
   amount: number;
   onBack: () => void;
+  /**
+   * Payment confirmed. The router applies the payment to the account and
+   * navigates away — this screen has no notion of what happens next.
+   */
+  onConfirm?: () => void;
 }
 
-export function PaymentConfirmation({ amount, onBack }: PaymentConfirmationProps) {
+export function PaymentConfirmation({ amount, onBack, onConfirm }: PaymentConfirmationProps) {
   const [methods, setMethods]             = useState<SavedMethod[]>(INITIAL_METHODS);
   const [selectedMethod, setSelectedMethod] = useState<string>('visa-4242');
   const [isEditing, setIsEditing]         = useState(false);
@@ -71,7 +76,7 @@ export function PaymentConfirmation({ amount, onBack }: PaymentConfirmationProps
   };
 
   return (
-    <div className="w-full max-w-md mx-auto">
+    <div className="w-full max-w-md mx-auto pb-8">
 
       {/* ── Header ── */}
       <div className="px-5 flex items-center justify-between mb-5">
@@ -114,7 +119,7 @@ export function PaymentConfirmation({ amount, onBack }: PaymentConfirmationProps
           </p>
           <button
             className="text-xs font-semibold"
-            style={{ color: COLORS.arcBlue }}
+            style={{ color: COLORS.accent }}
             onClick={() => setIsEditing((v) => !v)}
           >
             <AnimatePresence mode="wait" initial={false}>
@@ -197,8 +202,8 @@ export function PaymentConfirmation({ amount, onBack }: PaymentConfirmationProps
                         transition={{ duration: 0.15 }}
                         className="w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0"
                         style={{
-                          borderColor: isSelected ? COLORS.arcBlue : COLORS.surfaceBorder,
-                          background:  isSelected ? COLORS.arcBlue : '#ffffff',
+                          borderColor: isSelected ? COLORS.accent : COLORS.surfaceBorder,
+                          background:  isSelected ? COLORS.accent : '#ffffff',
                         }}
                       >
                         {isSelected && <div className="w-2 h-2 rounded-full bg-white" />}
@@ -265,6 +270,7 @@ export function PaymentConfirmation({ amount, onBack }: PaymentConfirmationProps
               className="w-full py-3.5 rounded-xl text-base font-semibold"
               style={{ background: '#1a1a2e', color: '#ffffff' }}
               whileTap={{ scale: 0.97 }}
+              onClick={onConfirm}
             >
               Pay €{amount.toFixed(2)}
             </motion.button>

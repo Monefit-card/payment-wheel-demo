@@ -54,6 +54,12 @@ export function formatDueDate(): string {
   });
 }
 
+/** "May 15" — the header's month-first form. */
+export function formatDueDateMonthDay(): string {
+  const due = getDueDate();
+  return `${due.toLocaleDateString('en-GB', { month: 'long' })} 15`;
+}
+
 export function formatDueDateShort(): string {
   const due = getDueDate();
   return `15 ${due.toLocaleDateString('en-GB', { month: 'long' })}`;
@@ -72,13 +78,27 @@ export function formatCurrency(amount: number): string {
   }).format(amount);
 }
 
+/**
+ * `€415.00` — symbol first, dot decimal. This is the form the screens are
+ * drawn in, so it's what UI should call; `formatCurrency` above is the de-DE
+ * locale form (`415,00 €`), which none of the designs show.
+ */
+export function formatEuro(amount: number): string {
+  return `€${amount.toFixed(2)}`;
+}
+
 const SNAP_THRESHOLD = 0.02;
 
 export function getPaymentZone(
   amount: number,
   minimumPayment: number,
   dueBalance: number,
-  totalBalance: number
+  totalBalance: number,
+  /**
+   * The credit-line slice of the minimum, when the minimum is shown split
+   * (see `splitMinimum` in `usePaymentState`). Zero means no split anchor.
+   */
+  creditMinimum: number = 0
 ): PaymentZone {
   if (totalBalance <= 0) return 'at_zero';
 
@@ -112,8 +132,24 @@ export function getPaymentZone(
   const minInRange = minDist < snapRange;
   const dueInRange = dueDist < snapRange;
 
+  // The credit/instalment split inside the minimum. Only a distinct anchor
+  // while it clears the minimum's own snap window — otherwise the two dots
+  // would fight over the same stretch of arc.
+  const creditSplit = creditMinimum > 0 && creditMinimum < minimumPayment - snapRange;
+  const creditDist = creditSplit ? Math.abs(amount - creditMinimum) : Infinity;
+  if (creditDist < snapRange && creditDist <= minDist && creditDist <= dueDist) {
+    return 'at_credit_minimum';
+  }
+
   if (minInRange && (!dueInRange || minDist <= dueDist)) return 'at_minimum';
   if (dueInRange) return 'at_due';
+
+  // Between the two halves of the minimum: the credit portion is covered and
+  // the due instalments are being paid into. Only below the credit minimum is
+  // the payment short of everything.
+  if (creditSplit && amount > creditMinimum && amount < minimumPayment) {
+    return 'between_credit_min_min';
+  }
 
   if (minimumPayment > 0 && amount < minimumPayment) return 'below_minimum';
   if (amount < dueBalance) return 'between_min_due';
@@ -128,10 +164,39 @@ interface ZoneInfoOpts {
   /** true when minimumPayment === dueBalance (small-balance case, balance ≤ €20) */
   minEqualsDue?: boolean;
   userType?: UserType;
+  /**
+   * Due Flex instalments folded into the wheel's figures. Only the drawer copy
+   * uses it: `getZoneEducation` appends a sentence naming the amount, since a
+   * minimum that quietly contains instalments is otherwise unexplainable.
+   */
+  flexDue?: number;
+  /**
+   * Instalments scheduled beyond this period. They're payable in Flex, not in
+   * the wheel, which is why the wheel's total sits below the total balance.
+   */
+  flexFuture?: number;
+  /** Interest forgiven by settling the plans early. */
+  flexInterestSaved?: number;
+  /**
+   * The live reduce-exposure outcome for a payment sitting above the card
+   * balance — `spreadAcrossPlans()`. Only the future-instalment stage reads
+   * it, to name what the payment is doing to the schedule.
+   */
+  flexSpread?: {
+    instalments: number;
+    monthlyBefore: number;
+    monthlyAfter: number;
+    saved: number;
+  };
 }
 
 export function getZoneInfo(zone: PaymentZone, opts?: ZoneInfoOpts): ZoneInfo {
-  const { dueEqualsTotal = false, minEqualsDue = false, userType } = opts ?? {};
+  const {
+    dueEqualsTotal = false,
+    minEqualsDue = false,
+    userType,
+    flexFuture = 0,
+  } = opts ?? {};
   const dueDate = formatDueDateShort(); // "15 May"
   const dueMonth = formatDueMonth();    // "April"
 
@@ -148,6 +213,20 @@ export function getZoneInfo(zone: PaymentZone, opts?: ZoneInfoOpts): ZoneInfo {
         zone,
         title: 'Below minimum',
         description: `Pay a little more by ${dueDate} to keep your account active.`,
+      };
+
+    case 'at_credit_minimum':
+      return {
+        zone,
+        title: 'Credit minimum',
+        description: `Covers the minimum on your credit line. Pay a little more by ${dueDate} to cover the Flex instalments due as well.`,
+      };
+
+    case 'between_credit_min_min':
+      return {
+        zone,
+        title: 'Due instalments',
+        description: `Covers your credit minimum and part of the Flex instalments due by ${dueDate}. Cover them all to meet your minimum payment.`,
       };
 
     case 'at_minimum':
@@ -193,10 +272,33 @@ export function getZoneInfo(zone: PaymentZone, opts?: ZoneInfoOpts): ZoneInfo {
       };
 
     case 'at_total':
+      // 'Card payment' only earns its name when there is a settlement step
+      // above it. With no future instalments, the card balance IS the total.
+      return flexFuture > 0
+        ? {
+            zone,
+            title: 'Card payment',
+            description: 'Pay this to clear your card balance and stay ahead on your finances.',
+          }
+        : {
+            zone,
+            title: 'Total payment',
+            description: 'Pay this to clear your full balance and stay ahead on your finances.',
+          };
+
+    case 'between_total_settlement':
+      return {
+        zone,
+        title: 'Future instalments',
+        description:
+          'Pay this to shrink the instalments still to come. The schedule and the number of payments stay the same.',
+      };
+
+    case 'at_settlement':
       return {
         zone,
         title: 'Total payment',
-        description: 'Pay this to clear your full balance and stay ahead on your finances.',
+        description: 'Pay this to clear your card and settle every Flex plan.',
       };
   }
 }
@@ -207,36 +309,78 @@ export function getZoneInfo(zone: PaymentZone, opts?: ZoneInfoOpts): ZoneInfo {
  * Long-form explanation of a stage, used in the info drawer. Date-free —
  * focuses on what each stage *means* rather than what to do this period.
  */
+/**
+ * The Flex sentence, shown only on the minimum-payment stage — that's the one
+ * figure a user can't reconcile without being told.
+ */
+function flexEducationClause(zone: PaymentZone, flexDue: number): string {
+  if (flexDue <= 0 || zone !== 'at_minimum') return '';
+  return ' Your minimum includes Flex instalments due this period.';
+}
+
 export function getZoneEducation(zone: PaymentZone, opts?: ZoneInfoOpts): string {
-  const { dueEqualsTotal = false, minEqualsDue = false, userType } = opts ?? {};
+  const {
+    dueEqualsTotal = false,
+    minEqualsDue = false,
+    userType,
+    flexDue = 0,
+    flexFuture = 0,
+    flexInterestSaved = 0,
+  } = opts ?? {};
+  const flexClause = flexEducationClause(zone, flexDue);
 
   switch (zone) {
     case 'at_zero':
-      return "Your balance is fully paid off — nothing is owed right now.";
+      return "Your balance is fully paid off — nothing is owed right now." + flexClause;
 
     case 'below_minimum':
-      return "This is less than the minimum payment required to keep your account in good standing. Falling short risks late fees and can get your card blocked.";
+      return "This is less than the minimum payment required to keep your account in good standing. Falling short risks late fees and can get your card blocked." + flexClause;
+
+    case 'at_credit_minimum':
+      return `The credit-line part of your minimum. Your full minimum adds the ${formatEuro(flexDue)} of Flex instalments due this period on top, and only covering both keeps your card active.`;
+
+    case 'between_credit_min_min':
+      return `Part-way through the ${formatEuro(flexDue)} of Flex instalments stacked on top of your credit minimum. Your minimum payment isn't met until every instalment due this period is covered.`;
 
     case 'at_minimum':
-      return "The smallest amount you can pay this period to keep your card active. Anything left unpaid rolls forward and starts accruing interest until it's cleared.";
+      return "The smallest amount you can pay this period to keep your card active. Anything left unpaid rolls forward and starts accruing interest until it's cleared." + flexClause;
 
     case 'between_min_due':
-      return "More than the minimum, but less than your full bill. Whatever you don't cover will roll forward to next period and start accruing interest.";
+      return "More than the minimum, but less than your full bill. Whatever you don't cover will roll forward to next period and start accruing interest." + flexClause;
 
     case 'at_due': {
       if (minEqualsDue && dueEqualsTotal) {
-        return "Pays off everything you owe. Because the balance is small, the minimum, the bill, and the total are all the same amount.";
+        return "Pays off everything you owe. Because the balance is small, the minimum, the bill, and the total are all the same amount." + flexClause;
       }
       if (dueEqualsTotal && userType === 'revolver') {
-        return "Pays off everything you owe, including any balance you've been carrying. This stops interest from accruing on your account.";
+        return "Pays off everything you owe, including any balance you've been carrying. This stops interest from accruing on your account." + flexClause;
       }
-      return "Your bill for this period — everything you've spent since your last statement. Paying it in full clears the bill and avoids any interest.";
+      return "Your bill for this period — everything you've spent since your last statement. Paying it in full clears the bill and avoids any interest." + flexClause;
     }
 
     case 'between_due_total':
-      return "More than your bill — you're paying ahead. This frees up available credit and reduces what you'll owe next period.";
+      return "More than your bill — you're paying ahead. This frees up available credit and reduces what you'll owe next period." + flexClause;
 
     case 'at_total':
-      return "Clears everything you owe — this period's bill plus anything carried forward. You'll start the next period with a clean slate.";
+      if (flexFuture > 0) {
+        return 'Clears your card. Your Flex plans continue on their schedule.';
+      }
+      return "Clears everything you owe — this period's bill plus anything carried forward. You'll start the next period with a clean slate." + flexClause;
+
+    case 'between_total_settlement': {
+      // Above the card balance the payment is spread across the upcoming
+      // instalments — never applied to one of them — so what it buys is a
+      // smaller monthly commitment, not a shorter plan.
+      const spread = opts?.flexSpread;
+      if (!spread || spread.instalments === 0) {
+        return 'Above your card balance, the payment goes to the Flex instalments still to come.';
+      }
+      return `Spread across the ${spread.instalments} instalment${spread.instalments === 1 ? '' : 's'} still to come. They're re-amortised over the same schedule, so each one gets smaller — ${formatEuro(spread.monthlyBefore)} to ${formatEuro(spread.monthlyAfter)} a month${spread.saved > 0 ? `, saving ${formatEuro(spread.saved)} in interest` : ''}.`;
+    }
+
+    case 'at_settlement':
+      return flexInterestSaved > 0
+        ? `Clears your card and settles every Flex plan, saving ${formatEuro(flexInterestSaved)} in interest.`
+        : 'Clears your card and settles every Flex plan.';
   }
 }

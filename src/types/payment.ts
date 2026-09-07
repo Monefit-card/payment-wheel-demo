@@ -3,11 +3,15 @@ export type UserType = 'transactor' | 'revolver';
 export type PaymentZone =
   | 'at_zero'
   | 'below_minimum'
+  | 'at_credit_minimum'
+  | 'between_credit_min_min'
   | 'at_minimum'
   | 'between_min_due'
   | 'at_due'
   | 'between_due_total'
-  | 'at_total';
+  | 'at_total'
+  | 'between_total_settlement'
+  | 'at_settlement';
 
 export interface AccountState {
   totalBalance: number;
