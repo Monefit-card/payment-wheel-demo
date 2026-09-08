@@ -24,15 +24,18 @@ interface InstalmentChooserProps {
   /** The live schedule for the current `n`. */
   instalments: Instalment[];
   onBack: () => void;
-  onContinue: () => void;
+  /** Creates the plan — this is the last screen before it exists. */
+  onConfirm: () => void;
 }
 
 /**
- * Step 2 — how many instalments.
+ * Step 2, and the last one — how many instalments, then confirm.
  *
  * The monthly repayment is the headline and updates live with the slider; the
  * cost of the choice (interest, total to repay) sits directly underneath it,
- * so a longer term never looks free.
+ * so a longer term never looks free. Everything needed to commit is already
+ * here — the schedule, the cost and the minimum-payment warning — so there is
+ * no separate review screen to restate it.
  */
 export function InstalmentChooser({
   items,
@@ -41,7 +44,7 @@ export function InstalmentChooser({
   onChangeN,
   instalments,
   onBack,
-  onContinue,
+  onConfirm,
 }: InstalmentChooserProps) {
   const plan = calcPlan(total, n);
 
@@ -49,7 +52,7 @@ export function InstalmentChooser({
     <FullScreenOverlay
       centerTitle="Select number of instalments"
       onBack={onBack}
-      footer={<PrimaryButton onClick={onContinue}>Confirm</PrimaryButton>}
+      footer={<PrimaryButton onClick={onConfirm}>Confirm plan</PrimaryButton>}
     >
       {items.length > 1 && (
         <div className="text-[13px] mx-1 mb-2.5" style={{ color: COLORS.labelMuted }}>

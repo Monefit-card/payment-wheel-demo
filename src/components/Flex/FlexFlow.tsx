@@ -1,9 +1,8 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { buildSchedule, parsePlanDate, round2 } from '@/lib/flex-math';
+import { buildSchedule, round2 } from '@/lib/flex-math';
 import { FlexPlan, Txn } from '@/types/app';
-import { AmortisationTable } from './AmortisationTable';
 import { FlexIntroStory } from './FlexIntroStory';
 import { FlexPicker } from './FlexPicker';
 import { FlexPlanDetail } from './FlexPlanDetail';
@@ -11,12 +10,16 @@ import { FlexPayoffWheel } from './FlexPayoffWheel';
 import { FlexPlanList } from './FlexPlanList';
 import { InstalmentChooser } from './InstalmentChooser';
 import { PlanCreated } from './PlanCreated';
-import { PlanReview } from './PlanReview';
 
 export type FlexMode = 'create' | 'manage';
 
-/** Steps of the create path. The prototype's step 2 skipped `review`; it doesn't here. */
-type CreateStep = 'pick' | 'choose' | 'review' | 'created';
+/**
+ * Steps of the create path. The instalment chooser is the last screen before
+ * the plan exists — it already carries the schedule and the full cost of the
+ * choice, so confirming happens there rather than on a review screen that
+ * would restate it.
+ */
+type CreateStep = 'pick' | 'choose' | 'created';
 
 export const DEFAULT_INSTALMENTS = 4;
 
@@ -47,9 +50,9 @@ export interface FlexFlowProps {
  * The Flex flows, as one overlay.
  *
  * Two entry points share the same state: `create` (pick what to flex → choose
- * instalments → review → success) and `manage` (plans → plan detail). "+ New"
- * on the manage list crosses over into the create path, and backing out of
- * the picker returns to the list rather than dismissing the whole flow.
+ * instalments and confirm → success) and `manage` (plans → plan detail).
+ * "+ New" on the manage list crosses over into the create path, and backing
+ * out of the picker returns to the list rather than dismissing the whole flow.
  */
 export function FlexFlow({
   mode,
@@ -71,12 +74,11 @@ export function FlexFlow({
   );
   const [n, setN] = useState(DEFAULT_INSTALMENTS);
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
-  const [amortOpen, setAmortOpen] = useState(false);
   const [payoffOpen, setPayoffOpen] = useState(false);
   const [introOpen, setIntroOpen] = useState(false);
 
-  // One clock for the whole flow, so the schedule shown on the chooser, the
-  // review and the amortisation table can't disagree by a render.
+  // One clock for the whole flow, so the schedule can't shift by a render
+  // between the chooser and the plan it creates.
   const [startDate] = useState(() => new Date());
 
   const toggle = (id: string) =>
@@ -101,10 +103,6 @@ export function FlexFlow({
 
   if (path === 'manage') {
     if (selectedPlan) {
-      const planStart = selectedPlan.instalments[0]
-        ? parsePlanDate(selectedPlan.instalments[0].date)
-        : startDate;
-
       return (
         <>
           <FlexPlanDetail
@@ -117,7 +115,6 @@ export function FlexFlow({
               setSelectedPlanId(null);
               onCancelPlan(id);
             }}
-            onOpenAmortisation={() => setAmortOpen(true)}
           />
 
           {payoffOpen && (
@@ -129,14 +126,6 @@ export function FlexFlow({
                 setSelectedPlanId(null);
                 onPayoffInstalments(selectedPlan.id, count);
               }}
-            />
-          )}
-          {amortOpen && (
-            <AmortisationTable
-              amount={selectedPlan.amount}
-              n={selectedPlan.n}
-              startDate={planStart}
-              onBack={() => setAmortOpen(false)}
             />
           )}
         </>
@@ -180,7 +169,9 @@ export function FlexFlow({
         />
       )}
 
-      {step === 'choose' && (
+      {/* Stays mounted through 'created' so the success sheet slides up over
+          the screen the plan was confirmed on. */}
+      {(step === 'choose' || step === 'created') && (
         <InstalmentChooser
           items={selectedItems}
           total={selectedTotal}
@@ -188,39 +179,17 @@ export function FlexFlow({
           onChangeN={setN}
           instalments={instalments}
           onBack={leaveChooser}
-          onContinue={() => setStep('review')}
-        />
-      )}
-
-      {(step === 'review' || step === 'created') && (
-        <PlanReview
-          items={selectedItems}
-          total={selectedTotal}
-          n={n}
-          instalments={instalments}
-          onBack={() => setStep('choose')}
           onConfirm={() => setStep('created')}
-          onOpenAmortisation={() => setAmortOpen(true)}
         />
       )}
 
-      {/* Kept mounted from the review step on, so it slides up over it. */}
-      {(step === 'review' || step === 'created') && (
+      {(step === 'choose' || step === 'created') && (
         <PlanCreated
           isOpen={step === 'created'}
           onDone={() => {
             onCreate({ txnIds: selectedItems.map((t) => t.id), n });
             onClose();
           }}
-        />
-      )}
-
-      {amortOpen && step !== 'created' && (
-        <AmortisationTable
-          amount={selectedTotal}
-          n={n}
-          startDate={startDate}
-          onBack={() => setAmortOpen(false)}
         />
       )}
 

@@ -11,10 +11,8 @@ export type { FlexFlowProps, FlexMode } from './FlexFlow';
 
 export { FlexPicker, FlexPickRow } from './FlexPicker';
 export { InstalmentChooser, MIN_INSTALMENTS, MAX_INSTALMENTS } from './InstalmentChooser';
-export { PlanReview } from './PlanReview';
 export { PlanCreated } from './PlanCreated';
 export { PlanOverview, PlanRow, ScheduleItem } from './PlanOverview';
-export { AmortisationTable, AmortisationLink } from './AmortisationTable';
 export { FlexPlanList } from './FlexPlanList';
 export { FlexPlanDetail } from './FlexPlanDetail';
 export { FlexChip, FlexedTag, FlexTxnRow } from './FlexTxnRow';

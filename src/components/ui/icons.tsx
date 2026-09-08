@@ -264,6 +264,22 @@ export function IconInfo({ size = 15, color = '#c4c4ca' }: IconProps) {
   );
 }
 
+/** Question mark — the help affordance that opens the support messenger. */
+export function IconHelp({ size = 20, color = COLORS.textPrimary }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 20 20" fill="none" aria-hidden="true">
+      <path
+        d="M7.4 7.3a2.65 2.65 0 015.2.75c0 1.77-2.6 2.15-2.6 4"
+        stroke={color}
+        strokeWidth="1.9"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <circle cx="10" cy="15.4" r="1.15" fill={color} />
+    </svg>
+  );
+}
+
 export function IconCheck({ size = 10, color = COLORS.textWhite }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 10 10" fill="none">

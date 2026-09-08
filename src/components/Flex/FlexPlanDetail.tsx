@@ -6,8 +6,10 @@ import { DetailRow } from '@/components/ui/DetailRow';
 import { FullScreenOverlay, NAV_BUTTON_STYLE } from '@/components/ui/FullScreenOverlay';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { Sheet } from '@/components/ui/Sheet';
+import { IconHelp } from '@/components/ui/icons';
 import { COLORS } from '@/lib/constants';
 import { flexRemainingTotal, flexSettlementQuote, planCloseEligibility } from '@/lib/flex-math';
+import { openIntercom } from '@/lib/intercom';
 import { formatEuro } from '@/lib/payment-math';
 import { FlexPlan } from '@/types/app';
 import { PlanOverview } from './PlanOverview';
@@ -24,7 +26,6 @@ interface FlexPlanDetailProps {
   onPayoff: () => void;
   /** Converts the plan's remaining balance back to Credit. */
   onClosePlan: (id: string) => void;
-  onOpenAmortisation: () => void;
 }
 
 /** One running plan — its schedule, what it cost, and the two ways to end it. */
@@ -35,9 +36,8 @@ export function FlexPlanDetail({
   onBack,
   onPayoff,
   onClosePlan,
-  onOpenAmortisation,
 }: FlexPlanDetailProps) {
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const [closeOpen, setCloseOpen] = useState(false);
 
   const remaining = flexRemainingTotal([plan]);
@@ -50,16 +50,16 @@ export function FlexPlanDetail({
       onBack={onBack}
       right={
         <button
-          onClick={() => setMenuOpen(true)}
-          aria-label="Plan options"
+          // Straight into the support messenger. `openIntercom` reports false
+          // when the widget isn't configured, and the sheet below stands in.
+          onClick={() => {
+            if (!openIntercom()) setHelpOpen(true);
+          }}
+          aria-label="Get help"
           className="w-[46px] h-[46px] rounded-[18px] flex items-center justify-center cursor-pointer"
           style={NAV_BUTTON_STYLE}
         >
-          <svg width="20" height="6" viewBox="0 0 20 6" fill="none" aria-hidden="true">
-            <circle cx="3" cy="3" r="2.1" fill={COLORS.textPrimary} />
-            <circle cx="10" cy="3" r="2.1" fill={COLORS.textPrimary} />
-            <circle cx="17" cy="3" r="2.1" fill={COLORS.textPrimary} />
-          </svg>
+          <IconHelp size={20} />
         </button>
       }
       footer={
@@ -97,16 +97,18 @@ export function FlexPlanDetail({
         your minimum payment will increase.
       </div>
 
-      {/* Plan options */}
-      <Sheet isOpen={menuOpen} onClose={() => setMenuOpen(false)} zIndex={58} title="Plan options">
-        <PrimaryButton
-          variant="light"
-          onClick={() => {
-            setMenuOpen(false);
-            onOpenAmortisation();
-          }}
+      {/* Stand-in for the messenger, so the help control still does something
+          on a build with no Intercom app id — the demo included. */}
+      <Sheet isOpen={helpOpen} onClose={() => setHelpOpen(false)} zIndex={58} title="Help">
+        <div
+          className="text-[13.5px] leading-[1.55] text-center px-1 mb-5"
+          style={{ color: COLORS.labelMuted }}
         >
-          Payment schedule
+          Support chat opens here. Set NEXT_PUBLIC_INTERCOM_APP_ID and this
+          control goes straight to the Intercom messenger instead.
+        </div>
+        <PrimaryButton variant="light" onClick={() => setHelpOpen(false)}>
+          Close
         </PrimaryButton>
       </Sheet>
 
