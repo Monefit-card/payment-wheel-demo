@@ -1,7 +1,14 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { buildSchedule, calcPlan, payoffStops, round2, spreadPayment } from '@/lib/flex-math';
+import {
+  buildSchedule,
+  calcPlan,
+  payoffStops,
+  planLabel,
+  round2,
+  spreadAcrossPlans,
+} from '@/lib/flex-math';
 import { calculateMinimumPayment, formatEuro } from '@/lib/payment-math';
 import { FlexPlan } from '@/types/app';
 
@@ -124,24 +131,66 @@ function Panel({
       )}
       {control}
       <Chart bars={bars} max={max} />
-      <div className="flex mt-4" style={{ borderTop: `1px solid ${RULE}` }}>
-        {figures.map((f) => (
-          <div key={f.label} className="flex-1 pt-3">
-            <div className="text-[11.5px]" style={{ color: FAINT }}>
-              {f.label}
-            </div>
-            <div
-              className="text-[17px] font-bold tabular-nums mt-0.5"
-              style={{ color: f.tone === 'positive' ? '#0E7A38' : INK }}
-            >
-              {f.value}
-            </div>
-          </div>
-        ))}
-      </div>
+      <Figures figures={figures} />
       <p className="text-[12px] leading-[1.45] mt-3" style={{ color: FAINT }}>
         {note}
       </p>
+    </div>
+  );
+}
+
+function Figures({
+  figures,
+}: {
+  figures: { label: string; value: string; tone?: 'positive' }[];
+}) {
+  return (
+    <div className="flex mt-4" style={{ borderTop: `1px solid ${RULE}` }}>
+      {figures.map((f) => (
+        <div key={f.label} className="flex-1 pt-3">
+          <div className="text-[11.5px]" style={{ color: FAINT }}>
+            {f.label}
+          </div>
+          <div
+            className="text-[17px] font-bold tabular-nums mt-0.5"
+            style={{ color: f.tone === 'positive' ? '#0E7A38' : INK }}
+          >
+            {f.value}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** One plan's instalments inside the multi-plan spread panel. */
+function PlanColumn({
+  label,
+  sub,
+  bars,
+  max,
+  foot,
+}: {
+  label: string;
+  sub: string;
+  bars: Bar[];
+  max: number;
+  foot: string;
+}) {
+  return (
+    <div className="flex-1 min-w-0">
+      <div className="flex items-baseline justify-between gap-2 mb-2">
+        <span className="text-[13px] font-semibold truncate" style={{ color: INK }}>
+          {label}
+        </span>
+        <span className="text-[11px] whitespace-nowrap" style={{ color: FAINT }}>
+          {sub}
+        </span>
+      </div>
+      <Chart bars={bars} max={max} />
+      <div className="text-[11.5px] leading-[1.45] mt-2.5 tabular-nums" style={{ color: MUTED }}>
+        {foot}
+      </div>
     </div>
   );
 }
@@ -272,32 +321,57 @@ export default function RepaymentMethodsPage() {
     })),
   ];
 
-  /* ── Outside the minimum: one plan's future instalments ──────────────── */
+  /* ── Above the card balance: every plan's future instalments ─────────── */
+
+  /** Instalment principal outstanding across all three plans. */
+  const spreadable = spreadAcrossPlans(plans, 0).principalBefore;
+  const [paymentRaw, setPayment] = useState(() => Math.round(spreadable * 0.35));
+  const payment = Math.min(paymentRaw, spreadable);
+  const spread = spreadAcrossPlans(plans, payment);
+
+  /** One scale for every plan, so a bar's height means the same thing across them. */
+  const futureMax = Math.max(
+    ...plans.flatMap((p) => p.instalments.map((i) => i.amount)),
+  );
+
+  /**
+   * A plan's instalments under the spread. The due one is already billed, so
+   * it holds; the upcoming ones are redrawn from the re-amortised schedule,
+   * and go to 'paid' only when the plan's whole remaining principal is prepaid.
+   */
+  const planBars = (plan: FlexPlan): Bar[] => {
+    const entry = spread.perPlan.find((e) => e.id === plan.id);
+    const upcoming = plan.instalments.filter((i) => i.state === 'upcoming').length;
+    const left = entry?.outcome.principalAfter ?? 0;
+    const after = left > 0 ? calcPlan(left, upcoming) : null;
+    let seen = 0;
+
+    return plan.instalments.map((instalment) => {
+      const month = instalment.date.split(' ')[1];
+      if (instalment.state !== 'upcoming') {
+        return {
+          key: String(instalment.n),
+          label: month,
+          before: instalment.amount,
+          after: instalment.amount,
+          due: instalment.state === 'due',
+        };
+      }
+      seen += 1;
+      return {
+        key: String(instalment.n),
+        label: month,
+        before: instalment.amount,
+        after: after ? (seen === upcoming ? after.last : after.monthly) : null,
+      };
+    });
+  };
+
+  /* ── Flex's own wheel: whole instalments, one plan ────────────────────── */
 
   const plan = plans[0];
   const months = plan.instalments.map((i) => i.date.split(' ')[1]);
-  const futureMax = Math.max(...plan.instalments.map((i) => i.amount));
-  const lastIndex = plan.instalments.length - 1;
-
-  const spreadable = spreadPayment(plan, 0).principalBefore;
-  const [paymentRaw, setPayment] = useState(() => Math.round(spreadable * 0.35));
-  const payment = Math.min(paymentRaw, spreadable);
-  const spread = spreadPayment(plan, payment);
-
-  const outsideSpreadBars: Bar[] = plan.instalments.map((instalment, i) => ({
-    key: String(instalment.n),
-    label: months[i],
-    before: instalment.amount,
-    due: instalment.state === 'due',
-    after:
-      instalment.state !== 'upcoming'
-        ? instalment.amount
-        : spread.principalAfter <= 0
-          ? 0
-          : i === lastIndex
-            ? calcPlan(spread.principalAfter, spread.instalments).last
-            : spread.monthlyAfter,
-  }));
+  const planMax = Math.max(...plan.instalments.map((i) => i.amount));
 
   const flexStops = payoffStops(plan);
   const [count, setCount] = useState(3);
@@ -381,33 +455,69 @@ export default function RepaymentMethodsPage() {
 
         <RowHeading
           title="2 · Future instalments (inside the total payment)"
-          sub="Above the minimum, the payment comes off principal and the remaining instalments are re-amortised over the same count at the same rate — they all get smaller. This period's instalment is already billed, so it never moves."
+          sub={`Above the card balance sits ${formatEuro(spreadable)} of instalment principal across ${plans.length} plans. A payment is split between them in proportion to what each has left, then each plan re-amortises its share over its own remaining instalments. The instalment already on this period's bill never moves — it belongs to the minimum.`}
         />
 
-        <div className="flex gap-4 flex-col lg:flex-row">
-          <Panel
-            control={
-              <Slider
-                label="Payment"
-                value={paymentRaw}
-                display={formatEuro(payment)}
-                min={0}
-                max={Math.ceil(spreadable)}
-                onChange={setPayment}
-              />
-            }
-            bars={outsideSpreadBars}
-            max={futureMax}
+        <div
+          className="rounded-2xl px-5 py-4"
+          style={{ background: '#fff', boxShadow: '0 2px 10px rgba(0,0,0,0.05)' }}
+        >
+          <h3 className="text-[17px] font-bold tracking-[-0.2px]" style={{ color: INK }}>
+            Paying above the card balance — main wheel
+          </h3>
+          <p className="text-[13px] leading-[1.45] mt-1 mb-4" style={{ color: MUTED }}>
+            Same rate, same dates, same number of payments. Every remaining
+            instalment on every plan simply gets smaller — none is settled, so a
+            plan only ends early once its whole remaining principal is prepaid.
+          </p>
+
+          <Slider
+            label="Payment above the card balance"
+            value={paymentRaw}
+            display={`${formatEuro(payment)} of ${formatEuro(spreadable)}`}
+            min={0}
+            max={Math.ceil(spreadable)}
+            onChange={setPayment}
+          />
+
+          <div className="flex gap-7 flex-col lg:flex-row">
+            {plans.map((p) => {
+              const entry = spread.perPlan.find((e) => e.id === p.id);
+              const left = p.instalments.filter((i) => i.state === 'upcoming').length;
+              const monthlyAfter = entry?.outcome.monthlyAfter ?? p.monthly;
+              return (
+                <PlanColumn
+                  key={p.id}
+                  label={planLabel(p)}
+                  sub={`${left} to come`}
+                  bars={planBars(p)}
+                  max={futureMax}
+                  foot={`${formatEuro(entry?.share ?? 0)} of the payment · ${formatEuro(p.monthly)} → ${
+                    monthlyAfter > 0 ? formatEuro(monthlyAfter) : 'settled'
+                  }`}
+                />
+              );
+            })}
+          </div>
+
+          <Figures
             figures={[
               {
-                label: 'Instalment',
+                label: 'Monthly across plans',
                 value: `${formatEuro(spread.monthlyBefore)} → ${formatEuro(spread.monthlyAfter)}`,
+              },
+              {
+                label: 'Principal left',
+                value: `${formatEuro(spread.principalBefore)} → ${formatEuro(spread.principalAfter)}`,
               },
               { label: 'Interest saved', value: formatEuro(spread.saved), tone: 'positive' },
             ]}
-            note="Term, count and rate unchanged — only the amounts move."
           />
-
+          <p className="text-[12px] leading-[1.45] mt-3" style={{ color: FAINT }}>
+            Pro-rata is what keeps the plans in step: an equal split would clear
+            the smallest plan first and leave the rest untouched. Term, count
+            and rate are unchanged throughout — only the amounts move.
+          </p>
         </div>
 
         <RowHeading
@@ -430,7 +540,7 @@ export default function RepaymentMethodsPage() {
               />
             }
             bars={outsideClearBars}
-            max={futureMax}
+            max={planMax}
             figures={[
               { label: 'You pay', value: formatEuro(stop?.amount ?? 0) },
               { label: 'Interest saved', value: formatEuro(stop?.saved ?? 0), tone: 'positive' },
@@ -461,7 +571,8 @@ export default function RepaymentMethodsPage() {
         </div>
 
         <div className="text-[13px] mt-7" style={{ color: FAINT }}>
-          Source: src/lib/flex-math.ts — spreadPayment(), payoffStops()
+          Source: src/lib/flex-math.ts — spreadAcrossPlans(), spreadPayment(),
+          payoffStops()
         </div>
       </div>
     </main>

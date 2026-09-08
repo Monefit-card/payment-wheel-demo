@@ -9,7 +9,6 @@ import { SCENARIOS } from '@/lib/scenarios';
 import { formatEuro } from '@/lib/payment-math';
 import { AccountState } from '@/types/payment';
 import { AppStateReturn } from '@/hooks/useAppState';
-import type { WheelVariant } from '@/app/page';
 
 interface AdminPanelProps {
   /** The single app store. The panel drives the scenario and the QA overrides. */
@@ -21,24 +20,7 @@ interface AdminPanelProps {
   wheelMinimum: number;
   /** `paymentState.applyPreset` — swaps the account and re-seeds the handle. */
   onApplyPreset: (state: AccountState) => void;
-  /** Which of the two wheel designs is on screen. */
-  wheelVariant: WheelVariant;
-  onWheelVariantChange: (variant: WheelVariant) => void;
 }
-
-const WHEEL_VARIANTS: { key: WheelVariant; label: string; caption: string }[] = [
-  {
-    key: 'with-settlement',
-    label: '1 · With instalments',
-    caption:
-      'Future instalments past the card balance, Flex interest box, "Card payment", split minimum anchor',
-  },
-  {
-    key: 'card-only',
-    label: '2 · Card only',
-    caption: 'No future instalments or Flex interest, "Balance", "Total payment"',
-  },
-];
 
 /** One read-only derived figure. */
 function ReadoutRow({
@@ -76,8 +58,6 @@ export function AdminPanel({
   app,
   wheelMinimum,
   onApplyPreset,
-  wheelVariant,
-  onWheelVariantChange,
 }: AdminPanelProps) {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -173,43 +153,6 @@ export function AdminPanel({
                   How reduce-exposure and clear-instalments differ, with worked examples
                 </div>
               </a>
-
-              <div className="space-y-2">
-                <h3
-                  className="text-xs font-semibold uppercase tracking-wider"
-                  style={{ color: COLORS.textMuted }}
-                >
-                  Wheel version
-                </h3>
-                {WHEEL_VARIANTS.map((v) => {
-                  const active = v.key === wheelVariant;
-                  return (
-                    <motion.button
-                      key={v.key}
-                      className="w-full text-left px-3 py-2.5 rounded-xl"
-                      style={{
-                        background: active ? '#3b82f6' : COLORS.background,
-                        border: `1px solid ${active ? '#3b82f6' : COLORS.surfaceBorder}`,
-                      }}
-                      whileTap={{ scale: 0.97 }}
-                      onClick={() => onWheelVariantChange(v.key)}
-                    >
-                      <div
-                        className="text-xs font-semibold"
-                        style={{ color: active ? '#fff' : COLORS.textPrimary }}
-                      >
-                        {v.label}
-                      </div>
-                      <div
-                        className="text-[10px] mt-0.5 leading-snug"
-                        style={{ color: active ? 'rgba(255,255,255,0.85)' : COLORS.textMuted }}
-                      >
-                        {v.caption}
-                      </div>
-                    </motion.button>
-                  );
-                })}
-              </div>
 
               <div className="h-px" style={{ background: COLORS.surfaceBorder }} />
 

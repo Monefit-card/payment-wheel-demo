@@ -46,13 +46,6 @@ export interface PaymentAppInput {
   /** Interest forgiven by settling now. */
   flexInterestSaved: number;
   /**
-   * Show the minimum split into its two parts: the credit-line minimum and the
-   * due Flex instalments stacked on top of it. Adds an anchor at the boundary,
-   * so the instalment slice of the minimum is visible on the ring rather than
-   * only explained in the drawer.
-   */
-  splitMinimum?: boolean;
-  /**
    * The active plans, for the stretch of ring above the card balance: a
    * payment there is spread across their upcoming instalments (METHOD 1 —
    * reduce exposure, see `spreadAcrossPlans`). The figures above stay the
@@ -85,7 +78,6 @@ export function usePaymentState(app?: PaymentAppInput) {
   const flexFutureAmount = app?.flexFutureAmount ?? 0;
   const flexSettlementAmount = app?.flexSettlementAmount ?? 0;
   const flexInterestSaved = app?.flexInterestSaved ?? 0;
-  const splitMinimum = app?.splitMinimum ?? false;
   const flexPlans = app?.flexPlans;
 
   /**
@@ -115,14 +107,14 @@ export function usePaymentState(app?: PaymentAppInput) {
 
   /**
    * The credit-line slice of the minimum — the anchor that separates it from
-   * the due instalments sitting on top. Zero when the split is off, when there
-   * are no due instalments, or when the credit portion is the whole minimum.
+   * the due instalments sitting on top. Zero when there are no due
+   * instalments, or when the credit portion is the whole minimum.
    */
   const creditMinimum = useMemo(() => {
-    if (!splitMinimum || flexDueAmount <= 0 || minimumPayment <= 0) return 0;
+    if (flexDueAmount <= 0 || minimumPayment <= 0) return 0;
     const credit = round2(minimumPayment - flexDueAmount);
     return credit > 0 ? credit : 0;
-  }, [splitMinimum, flexDueAmount, minimumPayment]);
+  }, [flexDueAmount, minimumPayment]);
 
   const isZeroBalance = accountState.totalBalance <= 0;
   const canPay = accountState.totalBalance > 0;
@@ -242,7 +234,9 @@ export function usePaymentState(app?: PaymentAppInput) {
         flexInterestSaved,
         // Names what a partial payment above the card balance does to the
         // schedule — the one stage whose meaning is the outcome, not the figure.
-        flexSpread: flexSpread ?? undefined,
+        flexSpread: flexSpread
+          ? { ...flexSpread, plans: flexSpread.perPlan.length }
+          : undefined,
       }),
     [
       zone,

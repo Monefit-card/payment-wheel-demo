@@ -20,9 +20,6 @@ import { flexedTxnIds } from '@/lib/flex-math';
  */
 type Screen = 'home' | 'bills' | 'wheel' | 'confirm';
 
-/** Which repayment wheel to render — see the note in `Home`. */
-export type WheelVariant = 'with-settlement' | 'card-only';
-
 /** Navigation depth. Tabs share depth 0, so a tab switch is never a push. */
 const SCREEN_DEPTH: Record<Screen, number> = {
   home: 0,
@@ -106,33 +103,20 @@ function StatusBar() {
 
 export default function Home() {
   const app = useAppState();
-  /**
-   * Two wheels to compare.
-   *
-   * 'with-settlement' is the full model: future instalments extend the ring
-   * into a settlement step, the balance line reports the account total, the
-   * top of the card range is called "Card payment", the minimum carries a
-   * second anchor splitting the credit-line minimum from the due instalments
-   * stacked on top of it, and the stretch above the card balance pays down the
-   * future instalments.
-   *
-   * 'card-only' hides future instalments from the wheel entirely. Feeding the
-   * three Flex figures in as zero covers most of that — the settlement
-   * segment, the Flex interest box, the "Total balance" label and the "Card
-   * payment" naming all key off them. Due instalments stay inside the minimum
-   * either way; only variant 1 shows where they begin.
-   */
-  const [wheelVariant, setWheelVariant] = useState<WheelVariant>('with-settlement');
-  const cardOnly = wheelVariant === 'card-only';
 
+  /**
+   * The wheel spans the whole Flex model: due instalments sit inside the
+   * minimum (split off by their own anchor), and future instalments extend the
+   * ring above the card balance, where a payment is spread across them. Every
+   * figure it needs comes from the one scenario store.
+   */
   const paymentState = usePaymentState({
     accountState: app.account,
     flexDueAmount: app.summary.flexDue,
-    flexFutureAmount: cardOnly ? 0 : app.summary.flexFuture,
-    flexSettlementAmount: cardOnly ? 0 : app.summary.flexSettlement,
-    flexInterestSaved: cardOnly ? 0 : app.summary.flexInterestSaved,
-    splitMinimum: !cardOnly,
-    flexPlans: cardOnly ? [] : app.scenario.flexPlans,
+    flexFutureAmount: app.summary.flexFuture,
+    flexSettlementAmount: app.summary.flexSettlement,
+    flexInterestSaved: app.summary.flexInterestSaved,
+    flexPlans: app.scenario.flexPlans,
     onAccountStateChange: app.overrideAccount,
   });
 
@@ -351,8 +335,6 @@ export default function Home() {
         app={app}
         wheelMinimum={paymentState.minimumPayment}
         onApplyPreset={paymentState.applyPreset}
-        wheelVariant={wheelVariant}
-        onWheelVariantChange={setWheelVariant}
       />
     </main>
   );

@@ -183,6 +183,9 @@ interface ZoneInfoOpts {
    * it, to name what the payment is doing to the schedule.
    */
   flexSpread?: {
+    /** Plans the payment is split between. */
+    plans: number;
+    /** Upcoming instalments it lands on, across all of them. */
     instalments: number;
     monthlyBefore: number;
     monthlyAfter: number;
@@ -215,18 +218,21 @@ export function getZoneInfo(zone: PaymentZone, opts?: ZoneInfoOpts): ZoneInfo {
         description: `Pay a little more by ${dueDate} to keep your account active.`,
       };
 
+    // Deliberately titled as below_minimum is: this stop covers the credit
+    // line's own minimum, but the minimum payment is the whole of it. Naming
+    // it "credit minimum" would read as a minimum the customer can settle at.
     case 'at_credit_minimum':
       return {
         zone,
-        title: 'Credit minimum',
-        description: `Covers the minimum on your credit line. Pay a little more by ${dueDate} to cover the Flex instalments due as well.`,
+        title: 'Below minimum',
+        description: `This covers your credit line, but not the Flex instalments due by ${dueDate}. Pay a little more to meet your minimum.`,
       };
 
     case 'between_credit_min_min':
       return {
         zone,
         title: 'Due instalments',
-        description: `Covers your credit minimum and part of the Flex instalments due by ${dueDate}. Cover them all to meet your minimum payment.`,
+        description: `Your credit line is covered and this is going to the Flex instalments due by ${dueDate}. Cover them all to meet your minimum.`,
       };
 
     case 'at_minimum':
@@ -291,7 +297,7 @@ export function getZoneInfo(zone: PaymentZone, opts?: ZoneInfoOpts): ZoneInfo {
         zone,
         title: 'Future instalments',
         description:
-          'Pay this to shrink the instalments still to come. The schedule and the number of payments stay the same.',
+          'Pay ahead on the instalments still to come. Each one gets smaller — your plans keep the same dates and the same number of payments.',
       };
 
     case 'at_settlement':
@@ -337,10 +343,10 @@ export function getZoneEducation(zone: PaymentZone, opts?: ZoneInfoOpts): string
       return "This is less than the minimum payment required to keep your account in good standing. Falling short risks late fees and can get your card blocked." + flexClause;
 
     case 'at_credit_minimum':
-      return `The credit-line part of your minimum. Your full minimum adds the ${formatEuro(flexDue)} of Flex instalments due this period on top, and only covering both keeps your card active.`;
+      return `Enough for your credit line's own minimum, but not for your minimum payment — that also includes the ${formatEuro(flexDue)} of Flex instalments due this period. Anything short of both counts as a missed minimum, which risks late fees and can get your card blocked.`;
 
     case 'between_credit_min_min':
-      return `Part-way through the ${formatEuro(flexDue)} of Flex instalments stacked on top of your credit minimum. Your minimum payment isn't met until every instalment due this period is covered.`;
+      return `Your credit line's minimum is covered and this is going toward the ${formatEuro(flexDue)} of Flex instalments due this period. It comes off all of them in the same proportion, so none is settled until they all are — and until then this is still below your minimum payment.`;
 
     case 'at_minimum':
       return "The smallest amount you can pay this period to keep your card active. Anything left unpaid rolls forward and starts accruing interest until it's cleared." + flexClause;
@@ -368,14 +374,21 @@ export function getZoneEducation(zone: PaymentZone, opts?: ZoneInfoOpts): string
       return "Clears everything you owe — this period's bill plus anything carried forward. You'll start the next period with a clean slate." + flexClause;
 
     case 'between_total_settlement': {
-      // Above the card balance the payment is spread across the upcoming
-      // instalments — never applied to one of them — so what it buys is a
-      // smaller monthly commitment, not a shorter plan.
+      // Above the card balance the payment is split between every plan and
+      // spread across the instalments each has left — never applied to one of
+      // them — so what it buys is a smaller monthly commitment on an unchanged
+      // schedule, not a shorter plan.
       const spread = opts?.flexSpread;
       if (!spread || spread.instalments === 0) {
-        return 'Above your card balance, the payment goes to the Flex instalments still to come.';
+        return "You're paying ahead on the Flex instalments still to come, beyond the one already on this period's bill.";
       }
-      return `Spread across the ${spread.instalments} instalment${spread.instalments === 1 ? '' : 's'} still to come. They're re-amortised over the same schedule, so each one gets smaller — ${formatEuro(spread.monthlyBefore)} to ${formatEuro(spread.monthlyAfter)} a month${spread.saved > 0 ? `, saving ${formatEuro(spread.saved)} in interest` : ''}.`;
+      const across =
+        spread.plans > 1
+          ? `split between your ${spread.plans} Flex plans in proportion to what each has left, then spread across the ${spread.instalments} instalments still to come`
+          : `spread across the ${spread.instalments} instalment${spread.instalments === 1 ? '' : 's'} still to come on your Flex plan`;
+      const saved =
+        spread.saved > 0 ? ` That forgives ${formatEuro(spread.saved)} of interest you'd have paid.` : '';
+      return `Anything above your card balance is ${across}. Nothing is settled outright — every instalment simply gets smaller, from ${formatEuro(spread.monthlyBefore)} to ${formatEuro(spread.monthlyAfter)} a month, on the same dates and the same number of payments.${saved}`;
     }
 
     case 'at_settlement':
