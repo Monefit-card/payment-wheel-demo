@@ -9,126 +9,71 @@ import { IconGear } from '@/components/ui/icons';
 import { COLORS } from '@/lib/constants';
 import { formatLongDate } from '@/lib/smartsaver';
 import { SmartSaverState } from '@/hooks/useSmartSaver';
-import { eur } from './format';
-import { HowItWorksList, RewardsOffer } from './RewardsOffer';
+import { RewardsOffer } from './RewardsOffer';
 import { VaultDashboard } from './VaultDashboard';
 
 interface RewardsScreenProps {
   ss: SmartSaverState;
-  lastMonthSpend: number;
   onNavigate: (tab: Tab) => void;
-  /** Start linking: the matched account, another account, or a new one. */
-  onLinkMatched: () => void;
-  onLoginOther: () => void;
-  onOpenAccount: () => void;
+  /** Open the SmartSaver login. */
+  onLink: () => void;
 }
 
 /** The Rewards tab — the Smart Card offer before linking, the Cashback Vault after. */
-export function RewardsScreen({
-  ss,
-  lastMonthSpend,
-  onNavigate,
-  onLinkMatched,
-  onLoginOther,
-  onOpenAccount,
-}: RewardsScreenProps) {
-  const [manageOpen, setManageOpen] = useState(false);
-  const [confirmUnlink, setConfirmUnlink] = useState(false);
-  const linked = ss.status === 'linked' && ss.ledger && ss.linkedAt;
-
-  const closeManage = () => {
-    setManageOpen(false);
-    setConfirmUnlink(false);
-  };
+export function RewardsScreen({ ss, onNavigate, onLink }: RewardsScreenProps) {
+  const [unlinkOpen, setUnlinkOpen] = useState(false);
+  const { ledger, linkedAt } = ss;
 
   return (
     <div className="relative flex flex-col flex-1 min-h-0">
       {/* Keyed on status so linking lands at the top of the vault, not
           wherever the offer was scrolled to. */}
       <div key={ss.status} className="no-scrollbar flex-1 overflow-y-auto px-4 pb-[120px]">
-        <div className="flex items-center justify-between pt-3 pb-4 px-1">
-          <h1 className="text-[30px] font-bold tracking-[-0.6px] m-0" style={{ color: COLORS.textPrimary }}>
-            Rewards
-          </h1>
-          {linked && (
+        {/* A tab (L1) never carries a title — only its controls. */}
+        {ledger ? (
+          <div className="flex justify-end pt-3 pb-4 px-1">
             <button
-              onClick={() => setManageOpen(true)}
+              onClick={() => setUnlinkOpen(true)}
               aria-label="Cashback settings"
               className="w-[42px] h-[42px] rounded-[16px] flex items-center justify-center"
               style={NAV_BUTTON_STYLE}
             >
               <IconGear size={19} />
             </button>
-          )}
-        </div>
-
-        {linked ? (
-          <VaultDashboard
-            ledger={ss.ledger!}
-            linkedAt={ss.linkedAt!}
-            vaults={ss.otherVaults}
-            txns={ss.otherTxns}
-            now={ss.now}
-          />
+          </div>
         ) : (
-          <RewardsOffer
-            status={ss.status as 'no_account' | 'email_match'}
-            lastMonthSpend={lastMonthSpend}
-            onLinkMatched={onLinkMatched}
-            onLoginOther={onLoginOther}
-            onOpenAccount={onOpenAccount}
-          />
+          <div className="pt-3" />
+        )}
+
+        {ledger && linkedAt ? (
+          <VaultDashboard ledger={ledger} vaults={ss.otherVaults} txns={ss.otherTxns} now={ss.now} />
+        ) : (
+          <RewardsOffer onLink={onLink} />
         )}
       </div>
 
       <TabBar active="rewards" onNavigate={onNavigate} />
 
-      {ss.ledger && (
-        <Sheet
-          isOpen={manageOpen}
-          onClose={closeManage}
-          title={confirmUnlink ? 'Stop cashback?' : 'Smart Card cashback'}
-          onBack={confirmUnlink ? () => setConfirmUnlink(false) : undefined}
-          zIndex={40}
-        >
-          {confirmUnlink ? (
-            <>
-              <p className="text-[14px] leading-[1.5] mt-0 mb-5" style={{ color: COLORS.labelMuted }}>
-                Card purchases stop earning from now. The {eur(ss.ledger.vaultBalance + ss.ledger.pending)} in your
-                Cashback Vault stays there and unlocks on {formatLongDate(ss.ledger.unlocksOn)} as planned. You can
-                link again any time.
-              </p>
-              <button
-                onClick={() => {
-                  ss.unlink();
-                  closeManage();
-                }}
-                className="w-full py-4 rounded-2xl text-base font-semibold"
-                style={{ background: COLORS.dangerSoft, color: COLORS.dangerText }}
-              >
-                Unlink SmartSaver
-              </button>
-              <div className="mt-2.5">
-                <PrimaryButton variant="light" onClick={() => setConfirmUnlink(false)}>
-                  Keep earning
-                </PrimaryButton>
-              </div>
-            </>
-          ) : (
-            <>
-              <HowItWorksList />
-              <div className="mt-2 text-[12.5px] leading-[1.5]" style={{ color: COLORS.textMuted }}>
-                Refunds take back the cashback they earned. Rates and rules may change; see the Smart Card terms.
-              </div>
-              <button
-                onClick={() => setConfirmUnlink(true)}
-                className="w-full mt-5 py-3.5 rounded-2xl text-[15px] font-semibold"
-                style={{ background: COLORS.screenSunken, color: COLORS.dangerText }}
-              >
-                Unlink SmartSaver
-              </button>
-            </>
-          )}
+      {ledger && (
+        <Sheet isOpen={unlinkOpen} onClose={() => setUnlinkOpen(false)} title="Unlink SmartSaver?" zIndex={40}>
+          <p className="text-[14px] leading-[1.5] mt-0 mb-5 text-center" style={{ color: COLORS.labelMuted }}>
+            Purchases stop earning. Your vault stays locked until {formatLongDate(ledger.unlocksOn)}.
+          </p>
+          <button
+            onClick={() => {
+              ss.unlink();
+              setUnlinkOpen(false);
+            }}
+            className="w-full py-4 rounded-2xl text-base font-semibold"
+            style={{ background: COLORS.dangerSoft, color: COLORS.dangerText }}
+          >
+            Unlink
+          </button>
+          <div className="mt-2.5">
+            <PrimaryButton variant="light" onClick={() => setUnlinkOpen(false)}>
+              Cancel
+            </PrimaryButton>
+          </div>
         </Sheet>
       )}
     </div>

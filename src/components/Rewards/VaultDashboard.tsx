@@ -12,39 +12,27 @@ import {
   EarnedPurchase,
   formatLongDate,
   formatShortDate,
-  MAX_CYCLE_CASHBACK,
-  Payout,
   SavingsTxn,
   SavingsVault,
 } from '@/lib/smartsaver';
 import { eur, eurWhole } from './format';
 import { SMART_SURFACE, SmartSurfaceLayers } from './SmartArt';
-import { IconCashback, IconLock, IconVault, SmartSaverMark } from './icons';
+import { IconLock } from './icons';
 
-const EYEBROW = 'text-[12px] font-semibold uppercase tracking-[0.06em]';
+const ROW_TITLE = 'text-[14.5px] font-semibold';
+const ROW_SUB = 'text-[12.5px] mt-px';
 
 /* ── Vault hero ──────────────────────────────────────────────────────────── */
 
-function VaultHero({ ledger, linkedAt }: { ledger: CashbackLedger; linkedAt: Date }) {
+/** Balance, what lands tomorrow, and how far through the lock we are. */
+function VaultHero({ ledger }: { ledger: CashbackLedger }) {
   const [whole, cents] = ledger.vaultBalance.toFixed(2).split('.');
   return (
     <div className="relative overflow-hidden rounded-[28px] px-6 pt-5 pb-6 text-white" style={SMART_SURFACE}>
       <SmartSurfaceLayers />
       <div className="relative">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <IconVault size={18} color="rgba(255,255,255,0.8)" />
-            <span className="text-[15px] font-medium" style={{ color: 'rgba(255,255,255,0.8)' }}>
-              Cashback Vault
-            </span>
-          </div>
-          <span
-            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[12px] font-medium"
-            style={{ background: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.85)' }}
-          >
-            <IconLock size={11} color="rgba(255,255,255,0.85)" />
-            Locked
-          </span>
+        <div className="text-[15px] font-medium" style={{ color: 'rgba(255,255,255,0.8)' }}>
+          Cashback Vault
         </div>
 
         <div className="flex items-baseline mt-2">
@@ -56,31 +44,24 @@ function VaultHero({ ledger, linkedAt }: { ledger: CashbackLedger; linkedAt: Dat
           </span>
         </div>
 
-        <div className="mt-2 text-[14px] tabular-nums" style={{ color: COLORS.smartGain }}>
-          {ledger.pending > 0
-            ? `+${eur(ledger.pending)} arriving tomorrow`
-            : ledger.vaultBalance === 0
-              ? 'Your first cashback lands the morning after you spend'
-              : 'Nothing pending — spend today, paid in tomorrow'}
-        </div>
+        {ledger.pending > 0 && (
+          <div className="mt-2 text-[14px] tabular-nums" style={{ color: COLORS.smartGain }}>
+            +{eur(ledger.pending)} tomorrow
+          </div>
+        )}
 
-        {/* Lock period */}
-        <div className="mt-6">
-          <div className="h-[5px] rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.12)' }}>
-            <div
-              className="h-full rounded-full"
-              style={{
-                width: `${Math.max(2, ledger.lockProgress * 100)}%`,
-                background: `linear-gradient(90deg, ${COLORS.smartAccent}, ${COLORS.smartGain})`,
-              }}
-            />
-          </div>
-          <div className="flex justify-between mt-2 text-[12px] tabular-nums" style={{ color: 'rgba(255,255,255,0.55)' }}>
-            <span>Opened {formatShortDate(linkedAt)}</span>
-            <span>
-              Unlocks {formatLongDate(ledger.unlocksOn)} · {ledger.daysToUnlock} days
-            </span>
-          </div>
+        <div className="mt-6 h-[5px] rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.12)' }}>
+          <div
+            className="h-full rounded-full"
+            style={{
+              width: `${Math.max(2, ledger.lockProgress * 100)}%`,
+              background: `linear-gradient(90deg, ${COLORS.smartAccent}, ${COLORS.smartGain})`,
+            }}
+          />
+        </div>
+        <div className="flex items-center gap-1.5 mt-2 text-[12.5px]" style={{ color: 'rgba(255,255,255,0.55)' }}>
+          <IconLock size={11} color="rgba(255,255,255,0.55)" />
+          Unlocks {formatLongDate(ledger.unlocksOn)}
         </div>
       </div>
     </div>
@@ -91,92 +72,66 @@ function VaultHero({ ledger, linkedAt }: { ledger: CashbackLedger; linkedAt: Dat
 
 function CapMeter({ ledger }: { ledger: CashbackLedger }) {
   const cap = CASHBACK_RULES.cycleSpendCap;
-  const share = Math.min(1, ledger.cycleCounted / cap);
   return (
-    <Card radius={24} className="mt-4 px-5 pt-4 pb-5">
-      <div className="flex items-baseline justify-between">
-        <span className={EYEBROW} style={{ color: COLORS.textSecondary }}>
-          This month
-        </span>
-        <span className="text-[13px] tabular-nums" style={{ color: COLORS.labelMuted }}>
-          {eur(ledger.cycleCashback)} of {eur(MAX_CYCLE_CASHBACK)} earned
-        </span>
-      </div>
-
-      <div className="mt-2.5 text-[17px] font-semibold tabular-nums" style={{ color: COLORS.textPrimary }}>
+    <Card radius={20} className="mt-3 px-5 py-4">
+      <div className="text-[14px] tabular-nums" style={{ color: COLORS.labelMuted }}>
         {ledger.capReached ? (
-          <>Cap reached for this month</>
+          <>Monthly cap reached · resets {formatShortDate(ledger.cycleResetsOn)}</>
         ) : (
           <>
-            {eurWhole(ledger.cycleCounted)}{' '}
-            <span style={{ color: COLORS.labelMuted, fontWeight: 500 }}>of {eurWhole(cap)} spend earning</span>
+            <span className="font-semibold" style={{ color: COLORS.textPrimary }}>
+              {eurWhole(ledger.cycleCounted)}
+            </span>{' '}
+            of {eurWhole(cap)} earning this month
           </>
         )}
       </div>
-
-      <div className="mt-3 h-2 rounded-full overflow-hidden" style={{ background: COLORS.screenSunken }}>
+      <div className="mt-2.5 h-1.5 rounded-full overflow-hidden" style={{ background: COLORS.screenSunken }}>
         <div
           className="h-full rounded-full"
-          style={{ width: `${share * 100}%`, background: ledger.capReached ? COLORS.textSecondary : COLORS.cashback }}
+          style={{
+            width: `${Math.min(1, ledger.cycleCounted / cap) * 100}%`,
+            background: ledger.capReached ? COLORS.textSecondary : COLORS.cashback,
+          }}
         />
-      </div>
-
-      <div className="mt-2.5 text-[12.5px] leading-[1.45]" style={{ color: COLORS.labelMuted }}>
-        {ledger.capReached
-          ? `Card purchases earn again from ${formatShortDate(ledger.cycleResetsOn)}. Your card works as normal until then.`
-          : `${eurWhole(cap - ledger.cycleCounted)} left to earn on · resets ${formatShortDate(ledger.cycleResetsOn)}`}
       </div>
     </Card>
   );
 }
 
-/* ── Lists ───────────────────────────────────────────────────────────────── */
+/* ── Cashback list ───────────────────────────────────────────────────────── */
 
 function PurchaseRow({ p }: { p: EarnedPurchase }) {
   return (
-    <div className="flex items-center gap-3 px-5 py-3">
-      <MerchantLogo icon={p.icon} size={38} radius={11} />
-      <div className="flex-1 min-w-0">
-        <div className="text-[14.5px] font-semibold truncate" style={{ color: COLORS.textPrimary }}>
-          {p.merchant}
-        </div>
-        <div className="text-[12.5px] mt-px tabular-nums" style={{ color: COLORS.labelMuted }}>
-          {eur(p.amount)}
-          {p.capped && (p.cashback > 0 ? ` · ${eur(p.spendCounted)} under cap` : ' · over the cap')}
-        </div>
+    <div className="flex items-center gap-3 px-5 py-2.5">
+      <MerchantLogo icon={p.icon} size={32} radius={9} />
+      <div className="flex-1 min-w-0 text-[14px] truncate" style={{ color: COLORS.textPrimary }}>
+        {p.merchant}
       </div>
-      <div
-        className="text-[14.5px] font-semibold tabular-nums"
-        style={{ color: p.cashback > 0 ? COLORS.cashbackText : COLORS.textMuted }}
-      >
+      <div className="text-[14px] tabular-nums" style={{ color: p.cashback > 0 ? COLORS.cashbackText : COLORS.textMuted }}>
         {eur(p.cashback, { sign: true })}
       </div>
     </div>
   );
 }
 
-function PayoutRow({ payout, now }: { payout: Payout; now: Date }) {
+/** One day's deposit — or tomorrow's, still pending. Opens to its purchases. */
+function DayRow({ label, amount, purchases }: { label: string; amount: number; purchases: EarnedPurchase[] }) {
   const [open, setOpen] = useState(false);
-  const n = payout.purchases.length;
+  const n = purchases.length;
   return (
     <div>
       <button onClick={() => setOpen((o) => !o)} className="w-full flex items-center gap-3 px-5 py-3 text-left">
-        <div
-          className="shrink-0 w-[38px] h-[38px] rounded-[11px] flex items-center justify-center"
-          style={{ background: COLORS.cashbackSoft }}
-        >
-          <IconCashback size={18} />
-        </div>
         <div className="flex-1 min-w-0">
-          <div className="text-[14.5px] font-semibold" style={{ color: COLORS.textPrimary }}>
-            Paid into vault
+          <div className={ROW_TITLE} style={{ color: COLORS.textPrimary }}>
+            {label}
           </div>
-          <div className="text-[12.5px] mt-px" style={{ color: COLORS.labelMuted }}>
-            {dayLabel(payout.date, now)} · {n} {n === 1 ? 'purchase' : 'purchases'}
+          <div className={ROW_SUB} style={{ color: COLORS.labelMuted }}>
+            {n} {n === 1 ? 'purchase' : 'purchases'}
           </div>
         </div>
-        <div className="text-[14.5px] font-semibold tabular-nums" style={{ color: COLORS.cashbackText }}>
-          {eur(payout.amount, { sign: true })}
+        <div className={`${ROW_TITLE} tabular-nums`} style={{ color: COLORS.cashbackText }}>
+          {eur(amount, { sign: true })}
         </div>
         <span style={{ transform: open ? 'rotate(90deg)' : 'none', transition: 'transform 0.2s' }}>
           <ChevronRight size={13} color={COLORS.textMuted} />
@@ -184,7 +139,7 @@ function PayoutRow({ payout, now }: { payout: Payout; now: Date }) {
       </button>
       {open && (
         <div className="pb-1.5" style={{ background: '#fafafb' }}>
-          {payout.purchases.map((p) => (
+          {purchases.map((p) => (
             <PurchaseRow key={p.id} p={p} />
           ))}
         </div>
@@ -193,63 +148,29 @@ function PayoutRow({ payout, now }: { payout: Payout; now: Date }) {
   );
 }
 
-function CashbackActivity({ ledger, now }: { ledger: CashbackLedger; now: Date }) {
+function CashbackList({ ledger, now }: { ledger: CashbackLedger; now: Date }) {
   if (ledger.purchases.length === 0) {
     return (
-      <Card radius={24} className="px-6 py-8 text-center">
-        <div
-          className="mx-auto w-12 h-12 rounded-2xl flex items-center justify-center"
-          style={{ background: COLORS.cashbackSoft }}
-        >
-          <IconCashback size={24} />
-        </div>
-        <div className="mt-3.5 text-[16px] font-semibold" style={{ color: COLORS.textPrimary }}>
-          No cashback yet
-        </div>
-        <p className="mt-1.5 text-[13.5px] leading-[1.45]" style={{ color: COLORS.labelMuted }}>
-          Use your Monefit card and your cashback shows here straight away. It’s paid into the vault the next morning.
-        </p>
-      </Card>
+      <div className="text-center text-[14px] py-8" style={{ color: COLORS.labelMuted }}>
+        Cashback from card purchases shows up here.
+      </div>
     );
   }
-
   return (
-    <>
+    <Card radius={24} className="py-1.5 overflow-hidden">
       {ledger.pendingPurchases.length > 0 && (
-        <>
-          <div className="flex items-baseline justify-between mx-1 mb-2.5">
-            <span className="text-base font-semibold" style={{ color: COLORS.textPrimary }}>
-              Arriving tomorrow
-            </span>
-            <span className="text-[13px] tabular-nums" style={{ color: COLORS.cashbackText }}>
-              {eur(ledger.pending, { sign: true })}
-            </span>
-          </div>
-          <Card radius={24} className="py-1.5 mb-6">
-            {ledger.pendingPurchases.map((p) => (
-              <PurchaseRow key={p.id} p={p} />
-            ))}
-          </Card>
-        </>
+        <DayRow label="Tomorrow" amount={ledger.pending} purchases={ledger.pendingPurchases} />
       )}
-
-      {ledger.payouts.length > 0 && (
-        <>
-          <div className="text-base font-semibold mx-1 mb-2.5" style={{ color: COLORS.textPrimary }}>
-            Paid in
-          </div>
-          <Card radius={24} className="py-1.5 overflow-hidden">
-            {ledger.payouts.map((payout) => (
-              <PayoutRow key={payout.date.getTime()} payout={payout} now={now} />
-            ))}
-          </Card>
-        </>
-      )}
-    </>
+      {ledger.payouts.map((p) => (
+        <DayRow key={p.date.getTime()} label={dayLabel(p.date, now)} amount={p.amount} purchases={p.purchases} />
+      ))}
+    </Card>
   );
 }
 
-function SavingsOverview({
+/* ── All savings ─────────────────────────────────────────────────────────── */
+
+function SavingsList({
   ledger,
   vaults,
   txns,
@@ -260,12 +181,12 @@ function SavingsOverview({
   txns: SavingsTxn[];
   now: Date;
 }) {
-  const total = ledger.vaultBalance + vaults.reduce((s, v) => s + v.balance, 0);
+  const rows = [{ id: 'cashback', name: 'Cashback Vault', balance: ledger.vaultBalance }, ...vaults];
 
-  // One activity feed across the account: other vaults' movements plus the
-  // Cashback Vault's daily deposits.
+  // One feed across the account: other vaults' movements plus the Cashback
+  // Vault's daily deposits.
   const activity = [
-    ...txns.map((t) => ({ id: t.id, label: t.label, vault: t.vault, amount: t.amount, date: t.date })),
+    ...txns,
     ...ledger.payouts.map((p) => ({
       id: `p${p.date.getTime()}`,
       label: 'Cashback',
@@ -275,95 +196,44 @@ function SavingsOverview({
     })),
   ]
     .sort((a, b) => b.date.getTime() - a.date.getTime())
-    .slice(0, 12);
+    .slice(0, 10);
 
   return (
     <>
-      <Card radius={24} className="px-5 pt-4 pb-2">
-        <div className="flex items-center gap-3">
-          <SmartSaverMark size={36} />
-          <div>
-            <div className={EYEBROW} style={{ color: COLORS.textSecondary }}>
-              SmartSaver total
-            </div>
-            <div className="text-[24px] font-bold tabular-nums" style={{ color: COLORS.textPrimary }}>
-              {eur(total)}
-            </div>
+      <Card radius={24} className="py-1.5">
+        {rows.map((v) => (
+          <div key={v.id} className="flex justify-between px-5 py-3">
+            <span className={ROW_TITLE} style={{ color: COLORS.textPrimary }}>
+              {v.name}
+            </span>
+            <span className={`${ROW_TITLE} tabular-nums`} style={{ color: COLORS.textPrimary }}>
+              {eur(v.balance)}
+            </span>
           </div>
-        </div>
+        ))}
+      </Card>
 
-        <div className="mt-3">
-          <div className="flex items-center gap-3 py-3" style={{ borderTop: `0.5px solid ${COLORS.divider}` }}>
-            <IconVault size={20} color={COLORS.textPrimary} />
-            <div className="flex-1">
-              <div className="text-[14.5px] font-semibold" style={{ color: COLORS.textPrimary }}>
-                Cashback Vault
-              </div>
-              <div className="text-[12.5px] flex items-center gap-1" style={{ color: COLORS.labelMuted }}>
-                <IconLock size={10} color={COLORS.labelMuted} /> Until {formatLongDate(ledger.unlocksOn)}
-              </div>
-            </div>
-            <div className="text-[14.5px] font-semibold tabular-nums" style={{ color: COLORS.textPrimary }}>
-              {eur(ledger.vaultBalance)}
-            </div>
-          </div>
-          {vaults.map((v) => (
-            <div key={v.id} className="flex items-center gap-3 py-3" style={{ borderTop: `0.5px solid ${COLORS.divider}` }}>
-              <IconVault size={20} color={COLORS.textSecondary} />
-              <div className="flex-1">
-                <div className="text-[14.5px] font-semibold" style={{ color: COLORS.textPrimary }}>
-                  {v.name}
+      {activity.length > 0 && (
+        <Card radius={24} className="mt-3 py-1.5">
+          {activity.map((a) => (
+            <div key={a.id} className="flex items-center justify-between px-5 py-3">
+              <div>
+                <div className={ROW_TITLE} style={{ color: COLORS.textPrimary }}>
+                  {a.label}
                 </div>
-                <div className="text-[12.5px]" style={{ color: COLORS.labelMuted }}>
-                  {v.kind}
+                <div className={ROW_SUB} style={{ color: COLORS.labelMuted }}>
+                  {a.vault} · {dayLabel(a.date, now)}
                 </div>
               </div>
-              <div className="text-[14.5px] font-semibold tabular-nums" style={{ color: COLORS.textPrimary }}>
-                {eur(v.balance)}
+              <div
+                className={`${ROW_TITLE} tabular-nums`}
+                style={{ color: a.label === 'Cashback' ? COLORS.cashbackText : COLORS.textPrimary }}
+              >
+                {eur(a.amount, { sign: true })}
               </div>
             </div>
           ))}
-        </div>
-      </Card>
-
-      <button
-        className="w-full mt-3 flex items-center justify-between px-5 py-4 rounded-[18px]"
-        style={{ background: COLORS.surface, boxShadow: '0 2px 10px rgba(0,0,0,0.05)' }}
-      >
-        <span className="text-[14.5px] font-semibold" style={{ color: COLORS.textPrimary }}>
-          Manage vaults in SmartSaver
-        </span>
-        <span className="text-[14px]" style={{ color: COLORS.textSecondary }}>
-          ↗
-        </span>
-      </button>
-
-      {activity.length > 0 && (
-        <>
-          <div className="text-base font-semibold mx-1 mt-6 mb-2.5" style={{ color: COLORS.textPrimary }}>
-            Activity
-          </div>
-          <Card radius={24} className="py-1.5">
-            {activity.map((a) => (
-              <div key={a.id} className="flex items-center justify-between px-5 py-3">
-                <div>
-                  <div className="text-[14.5px] font-semibold" style={{ color: COLORS.textPrimary }}>
-                    {a.label}
-                  </div>
-                  <div className="text-[12.5px] mt-px" style={{ color: COLORS.labelMuted }}>
-                    {a.vault} · {dayLabel(a.date, now)}
-                  </div>
-                </div>
-                <div
-                  className="text-[14.5px] font-semibold tabular-nums"
-                  style={{ color: a.label === 'Cashback' ? COLORS.cashbackText : COLORS.textPrimary }}
-                >
-                  {eur(a.amount, { sign: true })}
-                </div>
-              </div>
-            ))}
-          </Card>
-        </>
+        </Card>
       )}
     </>
   );
@@ -373,34 +243,21 @@ function SavingsOverview({
 
 interface VaultDashboardProps {
   ledger: CashbackLedger;
-  linkedAt: Date;
   vaults: SavingsVault[];
   txns: SavingsTxn[];
   now: Date;
 }
 
 /** Rewards once linked — the Cashback Vault first, the rest of SmartSaver a tap away. */
-export function VaultDashboard({ ledger, linkedAt, vaults, txns, now }: VaultDashboardProps) {
+export function VaultDashboard({ ledger, vaults, txns, now }: VaultDashboardProps) {
   const [view, setView] = useState<'cashback' | 'savings'>('cashback');
 
   return (
     <>
-      <VaultHero ledger={ledger} linkedAt={linkedAt} />
-
-      {ledger.projectedAtUnlock > ledger.vaultBalance + 0.5 && (
-        <div className="mt-3 mx-1 text-[13px] tabular-nums" style={{ color: COLORS.labelMuted }}>
-          At this month’s pace, about{' '}
-          <span className="font-semibold" style={{ color: COLORS.textPrimary }}>
-            {eurWhole(ledger.projectedAtUnlock)}
-          </span>{' '}
-          by {formatShortDate(ledger.unlocksOn)}.
-        </div>
-      )}
-
+      <VaultHero ledger={ledger} />
       <CapMeter ledger={ledger} />
 
-      {/* Segmented control */}
-      <div className="mt-6 mb-4 p-1 rounded-[14px] flex" style={{ background: 'rgba(19,20,23,0.06)' }}>
+      <div className="mt-6 mb-3 p-1 rounded-[14px] flex" style={{ background: 'rgba(19,20,23,0.06)' }}>
         {(
           [
             ['cashback', 'Cashback'],
@@ -424,9 +281,9 @@ export function VaultDashboard({ ledger, linkedAt, vaults, txns, now }: VaultDas
       </div>
 
       {view === 'cashback' ? (
-        <CashbackActivity ledger={ledger} now={now} />
+        <CashbackList ledger={ledger} now={now} />
       ) : (
-        <SavingsOverview ledger={ledger} vaults={vaults} txns={txns} now={now} />
+        <SavingsList ledger={ledger} vaults={vaults} txns={txns} now={now} />
       )}
     </>
   );

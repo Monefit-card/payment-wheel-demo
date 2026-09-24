@@ -9,15 +9,13 @@ export type Tab = 'home' | 'bills' | 'rewards';
 interface TabBarProps {
   active: Tab;
   onNavigate: (tab: Tab) => void;
-  /** Dot on the Rewards tab — an unclaimed offer. */
-  rewardsBadge?: boolean;
 }
 
 /**
  * Floating Home / Bills / Rewards pill, shared by every tab. Overlays the
  * scroll area, so each tab's content pads its bottom for it.
  */
-export function TabBar({ active, onNavigate, rewardsBadge = false }: TabBarProps) {
+export function TabBar({ active, onNavigate }: TabBarProps) {
   const tabs = [
     { key: 'home' as const, label: 'Home', icon: (on: boolean) => <IconHome color={COLORS.textPrimary} size={24} filled={on} /> },
     { key: 'bills' as const, label: 'Bills', icon: () => <IconReceipt color={COLORS.textPrimary} size={24} /> },
@@ -53,12 +51,6 @@ export function TabBar({ active, onNavigate, rewardsBadge = false }: TabBarProps
               style={{ opacity: on ? 1 : 0.55 }}
             >
               {icon(on)}
-              {key === 'rewards' && rewardsBadge && !on && (
-                <span
-                  className="absolute top-0.5 right-[22px] w-2 h-2 rounded-full"
-                  style={{ background: COLORS.cashback, boxShadow: '0 0 0 2px #fff' }}
-                />
-              )}
               <span
                 className="text-[11px]"
                 style={{ color: COLORS.textPrimary, fontWeight: on ? 700 : 500 }}

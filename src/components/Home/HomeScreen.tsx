@@ -344,7 +344,7 @@ export function HomeScreen({
         {cashback && <VaultWidget ledger={cashback} onOpen={() => onNavigate('rewards')} />}
       </div>
 
-      <TabBar active="home" onNavigate={onNavigate} rewardsBadge={!cashback} />
+      <TabBar active="home" onNavigate={onNavigate} />
 
       {/* Home indicator */}
       <div

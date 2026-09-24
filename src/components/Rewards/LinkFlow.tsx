@@ -14,23 +14,21 @@ import {
   SMARTSAVER_PROFILE,
   startOfDay,
 } from '@/lib/smartsaver';
-import { eurWhole } from './format';
 import { SMART_SURFACE, SmartCardArt, SmartSurfaceLayers } from './SmartArt';
-import { IconLock, IconVault, SmartSaverMark } from './icons';
+import { IconLock, SmartSaverMark } from './icons';
 
 /**
  * Linking the card to SmartSaver, from the Rewards tab.
  *
- *   login_match  → log in (email already known) → consent → confirmation
- *   login_other  → log in (any email)           → consent → confirmation
- *   open         → open an account from card KYC        → confirmation
+ *   log in (email pre-filled when it matches the card) → consent → confirmation
+ *   or, from the login: create an account from card KYC  → confirmation
  *
  * The login is native — a sheet in the card app, not a web view or an app
  * switch. The link itself (`onLink`) happens on consent, or on opening the
- * account; the confirmation that follows only explains what just started.
+ * account; the confirmation only shows it happened.
  */
 
-export type LinkMode = 'login_match' | 'login_other' | 'open';
+export type LinkMode = 'login_match' | 'login_other';
 
 type Step = 'login' | 'consent' | 'open' | 'working' | 'done';
 
@@ -41,6 +39,11 @@ interface LinkFlowProps {
   onClose: () => void;
   /** Finish on the Rewards tab, showing the new vault. */
   onDone: () => void;
+}
+
+/** When a vault opened today unlocks. */
+function unlockDate(): string {
+  return formatLongDate(addMonths(startOfDay(new Date()), CASHBACK_RULES.lockMonths));
 }
 
 const FIELD: React.CSSProperties = {
@@ -86,7 +89,15 @@ function GoogleLogo({ size = 18 }: { size?: number }) {
  * matched email is shown up front, but we can't know which method the
  * account was created with, so all three stay on offer.
  */
-function LoginStep({ matched, onSuccess }: { matched: boolean; onSuccess: () => void }) {
+function LoginStep({
+  matched,
+  onSuccess,
+  onCreate,
+}: {
+  matched: boolean;
+  onSuccess: () => void;
+  onCreate: () => void;
+}) {
   const [email, setEmail] = useState(matched ? SMARTSAVER_PROFILE.email : '');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState<LoginMethod | null>(null);
@@ -135,16 +146,6 @@ function LoginStep({ matched, onSuccess }: { matched: boolean; onSuccess: () => 
         <h2 className="mt-3 mb-0 text-[20px] font-bold tracking-[-0.3px]" style={{ color: COLORS.textPrimary }}>
           Log in to SmartSaver
         </h2>
-        <p className="mt-1 mb-0 text-[13.5px] leading-[1.45]" style={{ color: COLORS.labelMuted }}>
-          {matched ? (
-            <>
-              Log in as <b style={{ color: COLORS.textPrimary }}>{SMARTSAVER_PROFILE.email}</b> — the email on your
-              Monefit card.
-            </>
-          ) : (
-            'Use the account you want cashback paid into.'
-          )}
-        </p>
       </div>
 
       <div className="space-y-2.5">
@@ -155,7 +156,7 @@ function LoginStep({ matched, onSuccess }: { matched: boolean; onSuccess: () => 
       <div className="flex items-center gap-3 my-4">
         <div className="flex-1 h-px" style={{ background: COLORS.divider }} />
         <span className="text-[12.5px]" style={{ color: COLORS.textMuted }}>
-          or with email
+          or
         </span>
         <div className="flex-1 h-px" style={{ background: COLORS.divider }} />
       </div>
@@ -189,90 +190,62 @@ function LoginStep({ matched, onSuccess }: { matched: boolean; onSuccess: () => 
         aria-label="Password"
         value={password}
         onChange={(e) => setPassword(e.target.value)}
-        placeholder="Password (any works in this demo)"
+        placeholder="Password"
         className="w-full mt-2.5 px-4 py-3.5 rounded-2xl text-[15px] outline-none"
         style={FIELD}
       />
-      <div className="text-right mt-2 mr-1">
-        <span className="text-[13px] font-medium" style={{ color: COLORS.textSecondary }}>
-          Forgot password?
-        </span>
-      </div>
-
-      <div className="mt-4">
+      <div className="mt-3">
         <PrimaryButton type="submit" disabled={!canSubmit}>
           {busy === 'password' ? 'Logging in…' : 'Log in'}
         </PrimaryButton>
       </div>
+      <button
+        type="button"
+        onClick={onCreate}
+        className="w-full mt-1 pt-3 pb-1 text-[14px]"
+        style={{ color: COLORS.textSecondary }}
+      >
+        Don’t have an account?{' '}
+        <span className="font-semibold" style={{ color: COLORS.textPrimary }}>
+          Create one
+        </span>
+      </button>
     </form>
   );
 }
 
 /* ── Consent ─────────────────────────────────────────────────────────────── */
 
+/** The one screen that names the lock date — agreed to before the vault opens. */
 function ConsentStep({ onAllow, onCancel }: { onAllow: () => void; onCancel: () => void }) {
-  const unlocks = formatLongDate(addMonths(startOfDay(new Date()), CASHBACK_RULES.lockMonths));
   const rows = [
-    'Open a Cashback Vault in your SmartSaver account',
-    'Pay your card cashback into it every day',
-    'Show your SmartSaver balances and activity here',
+    'Open a Cashback Vault and pay into it',
+    `Keep it locked until ${unlockDate()}`,
+    'Show your SmartSaver balances here',
   ];
   return (
     <>
-      <div className="flex items-center justify-center gap-3 mb-4 -mt-1">
-        <div className="w-[52px] h-[52px] rounded-[16px] flex items-center justify-center" style={{ background: COLORS.smartInk }}>
-          <span className="text-white font-semibold tracking-[-0.04em] text-[15px]">
-            m<span style={{ color: COLORS.smartAccent }}>.</span>
-          </span>
-        </div>
-        <span className="text-[18px]" style={{ color: COLORS.textMuted }}>
-          ⇄
-        </span>
-        <SmartSaverMark size={52} />
-      </div>
-      <h2 className="text-center m-0 text-[20px] font-bold tracking-[-0.3px]" style={{ color: COLORS.textPrimary }}>
-        Link your card to SmartSaver
+      <h2 className="text-center mt-0 mb-4 text-[20px] font-bold tracking-[-0.3px]" style={{ color: COLORS.textPrimary }}>
+        Allow Monefit Card to
       </h2>
-      <p className="text-center mt-1 mb-4 text-[13.5px]" style={{ color: COLORS.labelMuted }}>
-        Monefit Card will be able to:
-      </p>
-
-      <Card radius={18} className="px-4 py-1" style={{ background: COLORS.screen, boxShadow: 'none' }}>
+      <div className="mb-5">
         {rows.map((r) => (
-          <div key={r} className="flex items-start gap-3 py-3">
+          <div key={r} className="flex items-start gap-3 py-2.5">
             <span
               className="mt-0.5 shrink-0 w-[18px] h-[18px] rounded-full flex items-center justify-center"
               style={{ background: COLORS.cashback }}
             >
               <IconCheck size={9} />
             </span>
-            <span className="text-[14px] leading-[1.4]" style={{ color: COLORS.textPrimary }}>
+            <span className="text-[15px] leading-[1.4]" style={{ color: COLORS.textPrimary }}>
               {r}
             </span>
           </div>
         ))}
-      </Card>
-
-      <div
-        className="mt-3 flex items-start gap-2.5 px-4 py-3 rounded-2xl text-[13px] leading-[1.45]"
-        style={{ background: '#FFF6E5', color: '#7A4B00' }}
-      >
-        <span className="mt-[3px]">
-          <IconLock size={13} color="#7A4B00" />
-        </span>
-        <span>
-          The Cashback Vault stays locked until <b>{unlocks}</b>. Money in it can’t be withdrawn before then.
-        </span>
       </div>
-
-      <p className="mt-3 mb-4 text-[12.5px] leading-[1.5]" style={{ color: COLORS.textMuted }}>
-        It can’t move or withdraw your other savings. Only purchases from now on earn cashback. Unlink any time in
-        Rewards.
-      </p>
-
-      <PrimaryButton onClick={onAllow}>Allow and link</PrimaryButton>
+      <PrimaryButton onClick={onAllow}>Allow</PrimaryButton>
       <button onClick={onCancel} className="w-full mt-1 py-3 text-[14px] font-medium" style={{ color: COLORS.textSecondary }}>
-        Not now
+        Cancel
       </button>
     </>
   );
@@ -280,14 +253,13 @@ function ConsentStep({ onAllow, onCancel }: { onAllow: () => void; onCancel: () 
 
 /* ── Open an account ─────────────────────────────────────────────────────── */
 
+/** Opened from the card's verified details — confirm them, agree, done. */
 function OpenAccountStep({ onBack, onOpen }: { onBack: () => void; onOpen: () => void }) {
   const [agreed, setAgreed] = useState(false);
-  const unlocks = formatLongDate(addMonths(startOfDay(new Date()), CASHBACK_RULES.lockMonths));
   const details: [string, string][] = [
     ['Name', SMARTSAVER_PROFILE.name],
     ['Email', SMARTSAVER_PROFILE.email],
     ['Phone', SMARTSAVER_PROFILE.phone],
-    ['Identity', 'Verified with your card'],
   ];
 
   return (
@@ -297,14 +269,10 @@ function OpenAccountStep({ onBack, onOpen }: { onBack: () => void; onOpen: () =>
       zIndex={70}
       footer={
         <PrimaryButton onClick={onOpen} disabled={!agreed}>
-          Open account and start earning
+          Open account
         </PrimaryButton>
       }
     >
-      <p className="mt-0 mb-4 mx-1 text-[14.5px] leading-[1.5]" style={{ color: COLORS.labelMuted }}>
-        We’ll use the details you verified for your Monefit card. Nothing to upload, no new ID check.
-      </p>
-
       <Card radius={20} className="px-4 py-1">
         {details.map(([k, v], i) => (
           <div
@@ -320,31 +288,14 @@ function OpenAccountStep({ onBack, onOpen }: { onBack: () => void; onOpen: () =>
         ))}
       </Card>
 
-      <div className="text-base font-semibold mx-1 mt-6 mb-2.5" style={{ color: COLORS.textPrimary }}>
-        What you get
-      </div>
-      <Card radius={20} className="px-4 py-1">
-        <div className="flex items-center gap-3 py-3.5">
-          <IconVault size={22} />
-          <div>
-            <div className="text-[14.5px] font-semibold" style={{ color: COLORS.textPrimary }}>
-              Cashback Vault
-            </div>
-            <div className="text-[12.5px]" style={{ color: COLORS.labelMuted }}>
-              Card cashback paid in daily · locked until {unlocks}
-            </div>
-          </div>
-        </div>
-      </Card>
-
       <button
         onClick={() => setAgreed((a) => !a)}
-        className="mt-5 mx-1 flex items-start gap-3 text-left"
+        className="mt-4 mx-1 flex items-center gap-3 text-left"
         role="checkbox"
         aria-checked={agreed}
       >
         <span
-          className="mt-0.5 shrink-0 w-[22px] h-[22px] rounded-[7px] flex items-center justify-center"
+          className="shrink-0 w-[22px] h-[22px] rounded-[7px] flex items-center justify-center"
           style={{
             background: agreed ? COLORS.ctaBackground : COLORS.surface,
             border: agreed ? 'none' : `1.5px solid ${COLORS.buttonDisabled}`,
@@ -352,8 +303,8 @@ function OpenAccountStep({ onBack, onOpen }: { onBack: () => void; onOpen: () =>
         >
           {agreed && <IconCheck size={11} />}
         </span>
-        <span className="text-[13.5px] leading-[1.45]" style={{ color: COLORS.labelStrong }}>
-          I agree to the SmartSaver terms and privacy policy, and to Monefit Card paying cashback into my Cashback Vault.
+        <span className="text-[14px]" style={{ color: COLORS.labelStrong }}>
+          I agree to the SmartSaver terms
         </span>
       </button>
     </FullScreenOverlay>
@@ -362,16 +313,8 @@ function OpenAccountStep({ onBack, onOpen }: { onBack: () => void; onOpen: () =>
 
 /* ── Confirmation ────────────────────────────────────────────────────────── */
 
-function Confirmation({ opened, onDone }: { opened: boolean; onDone: () => void }) {
-  const unlocks = formatLongDate(addMonths(startOfDay(new Date()), CASHBACK_RULES.lockMonths));
-  const pct = `${Math.round(CASHBACK_RULES.maxRate * 100)}%`;
-  const facts = [
-    ['Cashback', `Up to ${pct} on your first ${eurWhole(CASHBACK_RULES.cycleSpendCap)} each month`],
-    ['Paid in', 'Every morning, for the day before'],
-    ['Locked until', unlocks],
-    ['Starts', 'With your next card purchase'],
-  ];
-
+/** Shows the money path once — card to vault — and gets out of the way. */
+function Confirmation({ onDone }: { onDone: () => void }) {
   return (
     <div className="absolute inset-0 flex flex-col text-white" style={{ zIndex: 80, background: COLORS.smartInk }}>
       <style>
@@ -379,27 +322,15 @@ function Confirmation({ opened, onDone }: { opened: boolean; onDone: () => void 
           @keyframes ssRise { from { transform: translateY(14px); opacity: 0 } to { transform: none; opacity: 1 } }`}
       </style>
 
-      <div className="flex-1 overflow-y-auto no-scrollbar px-6 pt-[70px] pb-4">
-        <div style={{ animation: 'ssRise 0.5s ease both' }}>
-          <div
-            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-[12.5px] font-medium"
-            style={{ background: 'rgba(166,236,208,0.12)', color: COLORS.smartGain }}
-          >
-            <span className="w-4 h-4 rounded-full flex items-center justify-center" style={{ background: COLORS.smartGain }}>
-              <IconCheck size={8} color={COLORS.smartInk} />
-            </span>
-            {opened ? 'SmartSaver account opened' : 'SmartSaver linked'}
-          </div>
-          <h1 className="mt-4 mb-0 text-[32px] font-semibold leading-[1.05] tracking-[-0.035em]">
-            You’re earning cashback.
-          </h1>
-          <p className="mt-2.5 mb-0 text-[15px] leading-[1.5]" style={{ color: 'rgba(255,255,255,0.62)' }}>
-            We’ve opened a Cashback Vault in your SmartSaver. Here’s how money will reach it.
-          </p>
-        </div>
+      <div className="flex-1 flex flex-col justify-center px-6">
+        <h1
+          className="m-0 text-center text-[30px] font-semibold tracking-[-0.03em]"
+          style={{ animation: 'ssRise 0.5s ease both' }}
+        >
+          You’re earning cashback
+        </h1>
 
-        {/* Card → vault */}
-        <div className="mt-7 flex flex-col items-center" style={{ animation: 'ssRise 0.5s 0.12s ease both' }}>
+        <div className="mt-10 flex flex-col items-center" style={{ animation: 'ssRise 0.5s 0.12s ease both' }}>
           <SmartCardArt width={200} />
           <div className="relative h-[58px] w-full flex justify-center">
             <div className="absolute top-0 bottom-0 w-px" style={{ background: 'rgba(255,255,255,0.15)' }} />
@@ -412,41 +343,19 @@ function Confirmation({ opened, onDone }: { opened: boolean; onDone: () => void 
                 +€
               </span>
             ))}
-            <span
-              className="absolute left-1/2 top-1/2 -translate-y-1/2 ml-5 font-mono text-[11px] tracking-[0.1em]"
-              style={{ color: 'rgba(255,255,255,0.5)' }}
-            >
-              DAILY
-            </span>
           </div>
           <div className="relative overflow-hidden w-full rounded-[22px] px-5 py-4" style={SMART_SURFACE}>
             <SmartSurfaceLayers />
             <div className="relative flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <IconVault size={22} color="#fff" />
-                <div>
-                  <div className="text-[15px] font-semibold">Cashback Vault</div>
-                  <div className="text-[12.5px] flex items-center gap-1" style={{ color: 'rgba(255,255,255,0.55)' }}>
-                    <IconLock size={10} color="rgba(255,255,255,0.55)" /> Until {unlocks}
-                  </div>
+              <div>
+                <div className="text-[15px] font-semibold">Cashback Vault</div>
+                <div className="text-[12.5px] flex items-center gap-1" style={{ color: 'rgba(255,255,255,0.55)' }}>
+                  <IconLock size={10} color="rgba(255,255,255,0.55)" /> Until {unlockDate()}
                 </div>
               </div>
               <div className="text-[20px] font-semibold tabular-nums">€0.00</div>
             </div>
           </div>
-        </div>
-
-        <div className="mt-6" style={{ animation: 'ssRise 0.5s 0.24s ease both' }}>
-          {facts.map(([k, v], i) => (
-            <div
-              key={k}
-              className="flex justify-between gap-4 py-3 text-[14px]"
-              style={{ borderTop: i ? '1px solid rgba(255,255,255,0.08)' : 'none' }}
-            >
-              <span style={{ color: 'rgba(255,255,255,0.55)' }}>{k}</span>
-              <span className="text-right font-medium">{v}</span>
-            </div>
-          ))}
         </div>
       </div>
 
@@ -456,7 +365,7 @@ function Confirmation({ opened, onDone }: { opened: boolean; onDone: () => void 
           className="w-full py-4 rounded-2xl text-base font-semibold"
           style={{ background: COLORS.textWhite, color: COLORS.smartInk }}
         >
-          See my vault
+          Done
         </button>
       </div>
     </div>
@@ -466,7 +375,9 @@ function Confirmation({ opened, onDone }: { opened: boolean; onDone: () => void 
 /* ── Flow ────────────────────────────────────────────────────────────────── */
 
 export function LinkFlow({ mode, onLink, onOpenAndLink, onClose, onDone }: LinkFlowProps) {
-  const [step, setStep] = useState<Step>(mode === 'open' ? 'open' : 'login');
+  const [step, setStep] = useState<Step>('login');
+  /** Took the "create one" path, so the account is opened, not logged into. */
+  const [creating, setCreating] = useState(false);
   // The sheet animates in from its closed position, so mount closed and open
   // on the next frame.
   const [sheetShown, setSheetShown] = useState(false);
@@ -478,25 +389,39 @@ export function LinkFlow({ mode, onLink, onOpenAndLink, onClose, onDone }: LinkF
   useEffect(() => {
     if (step !== 'working') return;
     const t = setTimeout(() => {
-      if (mode === 'open') onOpenAndLink();
+      if (creating) onOpenAndLink();
       else onLink();
       setStep('done');
     }, 1100);
     return () => clearTimeout(t);
-  }, [step, mode, onLink, onOpenAndLink]);
+  }, [step, creating, onLink, onOpenAndLink]);
 
   const toConsent = useCallback(() => setStep('consent'), []);
+  const toCreate = useCallback(() => {
+    setCreating(true);
+    setStep('open');
+  }, []);
 
-  if (step === 'done') return <Confirmation opened={mode === 'open'} onDone={onDone} />;
+  if (step === 'done') return <Confirmation onDone={onDone} />;
 
-  if (step === 'open') return <OpenAccountStep onBack={onClose} onOpen={() => setStep('working')} />;
+  if (step === 'open') {
+    return (
+      <OpenAccountStep
+        onBack={() => {
+          setCreating(false);
+          setStep('login');
+        }}
+        onOpen={() => setStep('working')}
+      />
+    );
+  }
 
   if (step === 'working') {
     return (
       <div className="absolute inset-0 flex flex-col items-center justify-center gap-4" style={{ zIndex: 80, background: COLORS.smartInk }}>
         <Spinner color="#fff" />
         <div className="text-[15px]" style={{ color: 'rgba(255,255,255,0.7)' }}>
-          {mode === 'open' ? 'Opening your SmartSaver account…' : 'Opening your Cashback Vault…'}
+          {creating ? 'Opening your account…' : 'Linking…'}
         </div>
       </div>
     );
@@ -506,7 +431,7 @@ export function LinkFlow({ mode, onLink, onOpenAndLink, onClose, onDone }: LinkF
     <Sheet isOpen={sheetShown} onClose={onClose} zIndex={70} hideHeader className="pt-2.5">
       <div className="w-9 h-1 rounded-full mx-auto mb-5" style={{ background: 'rgba(19,20,23,0.18)' }} />
       {step === 'login' ? (
-        <LoginStep matched={mode === 'login_match'} onSuccess={toConsent} />
+        <LoginStep matched={mode === 'login_match'} onSuccess={toConsent} onCreate={toCreate} />
       ) : (
         <ConsentStep onAllow={() => setStep('working')} onCancel={onClose} />
       )}

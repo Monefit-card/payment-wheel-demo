@@ -128,12 +128,6 @@ export default function Home() {
   const ss = useSmartSaver(app.scenario.transactions);
   const [linkMode, setLinkMode] = useState<LinkMode | null>(null);
 
-  /** Last month's card spend — the most recent paid bill — sizes the offer's estimate. */
-  const lastMonthSpend = useMemo(() => {
-    const paid = app.scenario.months.filter((m) => m.state !== 'upcoming' && m.key !== app.scenario.currentMonthKey);
-    return paid.length ? paid[paid.length - 1].spent : app.summary.currentBill.spent;
-  }, [app.scenario, app.summary.currentBill.spent]);
-
   const [screen, setScreen] = useState<Screen>('home');
   // Which way the next transition slides: forward pushes in from the right.
   const [direction, setDirection] = useState(1);
@@ -291,18 +285,14 @@ export default function Home() {
                   summary={app.summary}
                   onPay={() => go('wheel')}
                   onNavigate={go}
-                  rewardsBadge={!ss.ledger}
                 />
               )}
 
               {screen === 'rewards' && (
                 <RewardsScreen
                   ss={ss}
-                  lastMonthSpend={lastMonthSpend}
                   onNavigate={go}
-                  onLinkMatched={() => setLinkMode('login_match')}
-                  onLoginOther={() => setLinkMode('login_other')}
-                  onOpenAccount={() => setLinkMode('open')}
+                  onLink={() => setLinkMode(ss.status === 'email_match' ? 'login_match' : 'login_other')}
                 />
               )}
 

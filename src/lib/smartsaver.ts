@@ -32,9 +32,6 @@ export function cashbackRate(): number {
   return CASHBACK_RULES.maxRate;
 }
 
-/** Most cashback one cycle can earn. */
-export const MAX_CYCLE_CASHBACK = round2(CASHBACK_RULES.cycleSpendCap * CASHBACK_RULES.maxRate);
-
 /* ── Dates ───────────────────────────────────────────────────────────────── */
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -143,18 +140,13 @@ export interface CashbackLedger {
   pendingPurchases: EarnedPurchase[];
   pending: number;
   vaultBalance: number;
-  /** Spend this cycle, and the part of it that earned cashback. */
-  cycleSpend: number;
+  /** Spend this cycle that fell under the cap. */
   cycleCounted: number;
-  cycleCashback: number;
   capReached: boolean;
   cycleResetsOn: Date;
   unlocksOn: Date;
   /** How far through the lock period we are, 0 → 1. */
   lockProgress: number;
-  daysToUnlock: number;
-  /** Vault balance at unlock if spend carries on at this cycle's pace. */
-  projectedAtUnlock: number;
   /** Look-up for the feed's cashback tags. */
   byFeedTxn: Map<string, EarnedPurchase>;
 }
@@ -221,19 +213,11 @@ export function buildLedger({ linkedAt, feed, history, now }: BuildLedgerInput):
 
   const thisCycle = cycleStart(now);
   const inCycle = earned.filter((p) => cycleStart(p.at).getTime() === thisCycle.getTime());
-  const cycleSpend = round2(inCycle.reduce((s, p) => s + p.amount, 0));
   const cycleCounted = round2(inCycle.reduce((s, p) => s + p.spendCounted, 0));
-  const cycleCashback = round2(inCycle.reduce((s, p) => s + p.cashback, 0));
 
   const unlocksOn = addMonths(startOfDay(linkedAt), CASHBACK_RULES.lockMonths);
   const lockSpan = unlocksOn.getTime() - startOfDay(linkedAt).getTime();
   const lockProgress = Math.min(1, Math.max(0, (now.getTime() - linkedAt.getTime()) / lockSpan));
-  const daysToUnlock = Math.max(0, Math.ceil((unlocksOn.getTime() - now.getTime()) / DAY_MS));
-
-  // Pace = this cycle's cashback per elapsed day, held to the cycle maximum.
-  const cycleDays = Math.max(1, Math.round((today.getTime() - thisCycle.getTime()) / DAY_MS) + 1);
-  const daily = Math.min(cycleCashback / cycleDays, MAX_CYCLE_CASHBACK / 30);
-  const projectedAtUnlock = round2(vaultBalance + pending + daily * daysToUnlock);
 
   return {
     purchases: [...earned].reverse(),
@@ -241,15 +225,11 @@ export function buildLedger({ linkedAt, feed, history, now }: BuildLedgerInput):
     pendingPurchases,
     pending,
     vaultBalance,
-    cycleSpend,
     cycleCounted,
-    cycleCashback,
     capReached: cycleCounted >= CASHBACK_RULES.cycleSpendCap,
     cycleResetsOn: addMonths(thisCycle, 1),
     unlocksOn,
     lockProgress,
-    daysToUnlock,
-    projectedAtUnlock,
     byFeedTxn: new Map(earned.filter((p) => p.feedTxnId).map((p) => [p.feedTxnId as string, p])),
   };
 }

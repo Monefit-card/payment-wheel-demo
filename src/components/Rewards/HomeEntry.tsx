@@ -20,10 +20,7 @@ export function SmartCardBanner({ onOpen }: { onOpen: () => void }) {
       <SmartSurfaceLayers />
       <div className="relative pl-5 pr-[118px] py-6">
         <div className="text-[19px] font-bold leading-tight">
-          Up to {Math.round(CASHBACK_RULES.maxRate * 100)}% cashback into savings
-        </div>
-        <div className="text-[15px] mt-1.5 leading-snug flex items-center gap-1" style={{ color: 'rgba(255,255,255,0.65)' }}>
-          Link SmartSaver <ChevronRight size={12} color="rgba(255,255,255,0.65)" />
+          {Math.round(CASHBACK_RULES.maxRate * 100)}% cashback into savings
         </div>
       </div>
       <div className="absolute -right-6 bottom-4 pointer-events-none" style={{ transform: 'rotate(-12deg)' }}>
@@ -33,7 +30,7 @@ export function SmartCardBanner({ onOpen }: { onOpen: () => void }) {
   );
 }
 
-/** Home widget once linked — the vault balance and what lands tomorrow. */
+/** Home widget once linked — the vault balance. */
 export function VaultWidget({ ledger, onOpen }: { ledger: CashbackLedger; onOpen: () => void }) {
   return (
     <button
@@ -54,15 +51,8 @@ export function VaultWidget({ ledger, onOpen }: { ledger: CashbackLedger; onOpen
         <span className="text-[12px] font-semibold uppercase tracking-[0.06em] whitespace-nowrap" style={{ color: COLORS.textSecondary }}>
           Cashback Vault
         </span>
-        <div className="flex items-baseline gap-2">
-          <span className="text-[22px] font-bold tabular-nums leading-tight" style={{ color: COLORS.textPrimary }}>
-            {eur(ledger.vaultBalance)}
-          </span>
-          {ledger.pending > 0 && (
-            <span className="text-[13px] font-medium tabular-nums" style={{ color: COLORS.cashbackText }}>
-              +{eur(ledger.pending)} tomorrow
-            </span>
-          )}
+        <div className="text-[22px] font-bold tabular-nums leading-tight" style={{ color: COLORS.textPrimary }}>
+          {eur(ledger.vaultBalance)}
         </div>
       </div>
       <ChevronRight size={18} color={COLORS.textPrimary} />

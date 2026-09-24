@@ -99,8 +99,6 @@ interface BillsScreenProps {
   /** Hands off to the payment wheel. */
   onPay: () => void;
   onNavigate: (tab: Tab) => void;
-  /** Dot on the Rewards tab until SmartSaver is linked. */
-  rewardsBadge?: boolean;
 }
 
 /**
@@ -109,7 +107,7 @@ interface BillsScreenProps {
  * Flex deliberately isn't here: instalment plans live on their own surface, so
  * this screen is only ever the credit bill and its transactions.
  */
-export function BillsScreen({ scenario, summary, onPay, onNavigate, rewardsBadge }: BillsScreenProps) {
+export function BillsScreen({ scenario, summary, onPay, onNavigate }: BillsScreenProps) {
   const [monthKey, setMonthKey] = useState(scenario.currentMonthKey);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [infoTopic, setInfoTopic] = useState<InfoKey | null>(null);
@@ -148,7 +146,7 @@ export function BillsScreen({ scenario, summary, onPay, onNavigate, rewardsBadge
         )}
       </div>
 
-      <TabBar active="bills" onNavigate={onNavigate} rewardsBadge={rewardsBadge} />
+      <TabBar active="bills" onNavigate={onNavigate} />
 
       <RepaymentSettingsSheet isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
       <InfoSheet topic={infoTopic} onClose={() => setInfoTopic(null)} />
