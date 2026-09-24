@@ -4,7 +4,8 @@ import { useState } from 'react';
 import { COLORS } from '@/lib/constants';
 import { AccountSummary } from '@/lib/derive-account';
 import { Bill, Scenario } from '@/types/app';
-import { IconCardSettings, IconHome, IconReceipt } from '@/components/ui/icons';
+import { IconCardSettings } from '@/components/ui/icons';
+import { Tab, TabBar } from '@/components/ui/TabBar';
 import { CreditSegment } from './CreditBill';
 import { InfoKey, InfoSheet } from './InfoSheet';
 import { RepaymentSettingsSheet } from './RepaymentSettingsSheet';
@@ -90,53 +91,6 @@ function MonthChips({ months, activeKey, onPick }: MonthChipsProps) {
   );
 }
 
-/* ── Tab bar ─────────────────────────────────────────────────────────────── */
-
-/** Floating Home/Bills pill. Overlays the scroll area, so content pads for it. */
-function TabBar({ onNavigateHome }: { onNavigateHome: () => void }) {
-  const tabs = [
-    { label: 'Home', Icon: IconHome, active: false, onClick: onNavigateHome },
-    { label: 'Bills', Icon: IconReceipt, active: true, onClick: undefined },
-  ];
-
-  return (
-    <div
-      className="absolute inset-x-0 bottom-0 h-[110px] flex justify-center items-end pb-3.5 pointer-events-none"
-      style={{
-        background: `linear-gradient(rgba(242,242,244,0), ${COLORS.screen} 60%)`,
-        zIndex: 7,
-      }}
-    >
-      <div
-        className="w-60 h-[68px] rounded-[34px] flex items-center justify-around px-2 pointer-events-auto"
-        style={{
-          background: 'rgba(255,255,255,0.78)',
-          backdropFilter: 'blur(20px)',
-          WebkitBackdropFilter: 'blur(20px)',
-          border: '0.5px solid rgba(0,0,0,0.05)',
-        }}
-      >
-        {tabs.map(({ label, Icon, active, onClick }) => (
-          <button
-            key={label}
-            onClick={onClick}
-            className="flex flex-col items-center gap-0.5 px-6 py-1"
-            style={{ opacity: active ? 1 : 0.55 }}
-          >
-            <Icon color={COLORS.textPrimary} size={24} />
-            <span
-              className="text-[11px]"
-              style={{ color: COLORS.textPrimary, fontWeight: active ? 700 : 500 }}
-            >
-              {label}
-            </span>
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 /* ── Screen ──────────────────────────────────────────────────────────────── */
 
 interface BillsScreenProps {
@@ -144,7 +98,9 @@ interface BillsScreenProps {
   summary: AccountSummary;
   /** Hands off to the payment wheel. */
   onPay: () => void;
-  onNavigateHome: () => void;
+  onNavigate: (tab: Tab) => void;
+  /** Dot on the Rewards tab until SmartSaver is linked. */
+  rewardsBadge?: boolean;
 }
 
 /**
@@ -153,7 +109,7 @@ interface BillsScreenProps {
  * Flex deliberately isn't here: instalment plans live on their own surface, so
  * this screen is only ever the credit bill and its transactions.
  */
-export function BillsScreen({ scenario, summary, onPay, onNavigateHome }: BillsScreenProps) {
+export function BillsScreen({ scenario, summary, onPay, onNavigate, rewardsBadge }: BillsScreenProps) {
   const [monthKey, setMonthKey] = useState(scenario.currentMonthKey);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [infoTopic, setInfoTopic] = useState<InfoKey | null>(null);
@@ -192,7 +148,7 @@ export function BillsScreen({ scenario, summary, onPay, onNavigateHome }: BillsS
         )}
       </div>
 
-      <TabBar onNavigateHome={onNavigateHome} />
+      <TabBar active="bills" onNavigate={onNavigate} rewardsBadge={rewardsBadge} />
 
       <RepaymentSettingsSheet isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
       <InfoSheet topic={infoTopic} onClose={() => setInfoTopic(null)} />

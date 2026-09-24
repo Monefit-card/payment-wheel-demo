@@ -9,10 +9,14 @@ import { SCENARIOS } from '@/lib/scenarios';
 import { formatEuro } from '@/lib/payment-math';
 import { AccountState } from '@/types/payment';
 import { AppStateReturn } from '@/hooks/useAppState';
+import { SmartSaverState } from '@/hooks/useSmartSaver';
+import { SMARTSAVER_PRESETS } from '@/lib/smartsaver';
 
 interface AdminPanelProps {
   /** The single app store. The panel drives the scenario and the QA overrides. */
   app: AppStateReturn;
+  /** The card ↔ SmartSaver link — switched independently of the scenario. */
+  smartSaver: SmartSaverState;
   /**
    * The wheel's live minimum — it reflects the overrides below, which
    * `summary.minimumPayment` (derived from the scenario alone) does not.
@@ -56,6 +60,7 @@ function ReadoutRow({
 
 export function AdminPanel({
   app,
+  smartSaver,
   wheelMinimum,
   onApplyPreset,
 }: AdminPanelProps) {
@@ -193,6 +198,50 @@ export function AdminPanel({
                     </motion.button>
                   );
                 })}
+              </div>
+
+              <div className="h-px" style={{ background: COLORS.surfaceBorder }} />
+
+              {/* Smart Card — which SmartSaver situation the customer is in. */}
+              <div className="space-y-2">
+                <h3
+                  className="text-xs font-semibold uppercase tracking-wider"
+                  style={{ color: COLORS.textMuted }}
+                >
+                  Smart Card · SmartSaver
+                </h3>
+                {SMARTSAVER_PRESETS.map((p) => {
+                  const active = p.key === smartSaver.presetKey;
+                  return (
+                    <motion.button
+                      key={p.key}
+                      className="w-full text-left px-3 py-2.5 rounded-xl"
+                      style={{
+                        background: active ? '#3b82f6' : COLORS.background,
+                        border: `1px solid ${active ? '#3b82f6' : COLORS.surfaceBorder}`,
+                      }}
+                      whileTap={{ scale: 0.97 }}
+                      onClick={() => smartSaver.applyPreset(p.key)}
+                    >
+                      <div
+                        className="text-xs font-semibold"
+                        style={{ color: active ? '#fff' : COLORS.textPrimary }}
+                      >
+                        {p.label}
+                      </div>
+                      <div
+                        className="text-[10px] mt-0.5 leading-snug"
+                        style={{ color: active ? 'rgba(255,255,255,0.85)' : COLORS.textMuted }}
+                      >
+                        {p.caption}
+                      </div>
+                    </motion.button>
+                  );
+                })}
+                <p className="text-[10px] leading-snug" style={{ color: COLORS.textMuted }}>
+                  Status now: {smartSaver.status.replace('_', ' ')}. Linking in the app updates this without changing
+                  the selected preset.
+                </p>
               </div>
 
               <div className="h-px" style={{ background: COLORS.surfaceBorder }} />

@@ -40,6 +40,15 @@ export const COLORS = {
   buttonDisabled: '#C9C9CE',
   labelMuted: '#898989',        // sub lines in ported list rows
   labelStrong: '#6F6F74',
+
+  // Smart Card — cashback into SmartSaver. Mint and periwinkle from the
+  // Smart Card deck, deepened where they carry text on white.
+  cashback: '#14A67E',          // cashback amounts, earning state
+  cashbackSoft: 'rgba(20,166,126,0.12)',
+  cashbackText: '#0B7659',      // cashback green, legible as text on cashbackSoft
+  smartInk: '#0b0c0f',          // the Smart Card / vault surface
+  smartAccent: '#9ab8ff',
+  smartGain: '#a6ecd0',
 };
 
 /**

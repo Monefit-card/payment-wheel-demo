@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { motion } from 'motion/react';
 import { COLORS } from '@/lib/constants';
 import { getDueDate, formatEuro } from '@/lib/payment-math';
@@ -8,14 +8,10 @@ import { flexedTxnIds, flexRemainingTotal } from '@/lib/flex-math';
 import { AccountSummary } from '@/lib/derive-account';
 import { Scenario } from '@/types/app';
 import { FlexTxnRow } from '@/components/Flex/FlexTxnRow';
-import {
-  BillsIcon,
-  CardIcon,
-  CardStackArt,
-  ChevronRight,
-  CloseIcon,
-  HomeIcon,
-} from './icons';
+import { SmartCardBanner, VaultWidget } from '@/components/Rewards/HomeEntry';
+import { Tab, TabBar } from '@/components/ui/TabBar';
+import { CashbackLedger } from '@/lib/smartsaver';
+import { CardIcon, CardStackArt, ChevronRight, CloseIcon } from './icons';
 
 const ACCOUNT_HOLDER_INITIALS = 'JS';
 
@@ -80,8 +76,10 @@ interface HomeScreenProps {
   summary: AccountSummary;
   /** Open the payment wheel. */
   onPay: () => void;
-  /** Switch to the Bills tab. */
-  onNavigateBills: () => void;
+  /** Switch tab. */
+  onNavigate: (tab: Tab) => void;
+  /** The Smart Card ledger once SmartSaver is linked; null before. */
+  cashback: CashbackLedger | null;
   /** Open Flex with no transaction pre-selected (manage, or create). */
   onOpenFlex: () => void;
   /** Open the full transactions page. */
@@ -94,12 +92,22 @@ export function HomeScreen({
   scenario,
   summary,
   onPay,
-  onNavigateBills,
+  onNavigate,
+  cashback,
   onOpenFlex,
   onOpenTransactions,
   onFlexTxn,
 }: HomeScreenProps) {
   const [promoDismissed, setPromoDismissed] = useState(false);
+  const [slide, setSlide] = useState(0);
+  const carouselRef = useRef<HTMLDivElement>(null);
+
+  /** Smart Card leads the carousel until the customer links SmartSaver. */
+  const slides = [
+    ...(cashback ? [] : ['smart' as const]),
+    ...(promoDismissed ? [] : ['card' as const]),
+  ];
+  const activeSlide = Math.min(slide, Math.max(0, slides.length - 1));
 
   /**
    * "Spent" is the credit line in use, so it must be the figure `available`
@@ -124,7 +132,7 @@ export function HomeScreen({
 
   return (
     <div className="relative flex flex-col flex-1 min-h-0">
-      <div className="flex-1 overflow-y-auto px-5 pb-24">
+      <div className="no-scrollbar flex-1 overflow-y-auto px-5 pb-[120px]">
         {/* Account holder + card shortcut */}
         <div className="flex items-center justify-between pt-3">
           <SquareButton label="Account">
@@ -180,50 +188,75 @@ export function HomeScreen({
           </button>
         </div>
 
-        {/* Promo carousel */}
-        {!promoDismissed && (
+        {/* Promo carousel — swipeable, one card per slide. */}
+        {slides.length > 0 && (
           <>
-            <Card className="mt-4 relative overflow-hidden">
-              <button
-                aria-label="Dismiss"
-                onClick={() => setPromoDismissed(true)}
-                className="absolute top-3.5 right-3.5 z-10 w-6 h-6 flex items-center justify-center"
-              >
-                <CloseIcon />
-              </button>
+            <div
+              ref={carouselRef}
+              onScroll={(e) => {
+                const el = e.currentTarget;
+                setSlide(Math.round(el.scrollLeft / el.clientWidth));
+              }}
+              className="no-scrollbar mt-4 -mx-5 px-5 flex gap-3 overflow-x-auto"
+              style={{ scrollSnapType: 'x mandatory', scrollPaddingInline: 20 }}
+            >
+              {slides.map((key) => (
+                <div key={key} className="shrink-0 w-full" style={{ scrollSnapAlign: 'start' }}>
+                  {key === 'smart' ? (
+                    <SmartCardBanner onOpen={() => onNavigate('rewards')} />
+                  ) : (
+                    <Card className="relative overflow-hidden h-full">
+                      <button
+                        aria-label="Dismiss"
+                        onClick={() => setPromoDismissed(true)}
+                        className="absolute top-3.5 right-3.5 z-10 w-6 h-6 flex items-center justify-center"
+                      >
+                        <CloseIcon />
+                      </button>
 
-              <div className="pl-5 pr-[104px] py-6">
-                <h2
-                  className="text-[19px] font-bold leading-tight"
-                  style={{ color: COLORS.textPrimary }}
-                >
-                  Order the Monefit card
-                </h2>
-                <p
-                  className="text-[15px] mt-1.5 leading-snug"
-                  style={{ color: COLORS.textSecondary }}
-                >
-                  Get the limited-edition original Monefit Black card
-                </p>
-              </div>
+                      <div className="pl-5 pr-[104px] py-6">
+                        <h2
+                          className="text-[19px] font-bold leading-tight"
+                          style={{ color: COLORS.textPrimary }}
+                        >
+                          Order the Monefit card
+                        </h2>
+                        <p
+                          className="text-[15px] mt-1.5 leading-snug"
+                          style={{ color: COLORS.textSecondary }}
+                        >
+                          Get the limited-edition original Monefit Black card
+                        </p>
+                      </div>
 
-              {/* Anchored bottom-right so it stays clear of the dismiss button */}
-              <div className="absolute -right-1 bottom-0 scale-[0.92] origin-bottom-right">
-                <CardStackArt />
-              </div>
-            </Card>
-
-            <div className="flex items-center justify-center gap-1.5 mt-3.5">
-              {[0, 1, 2].map((i) => (
-                <span
-                  key={i}
-                  className="w-[7px] h-[7px] rounded-full"
-                  style={{
-                    background: i === 0 ? COLORS.textPrimary : '#c7c7cc',
-                  }}
-                />
+                      {/* Anchored bottom-right so it stays clear of the dismiss button */}
+                      <div className="absolute -right-1 bottom-0 scale-[0.92] origin-bottom-right">
+                        <CardStackArt />
+                      </div>
+                    </Card>
+                  )}
+                </div>
               ))}
             </div>
+
+            {slides.length > 1 && (
+              <div className="flex items-center justify-center gap-1.5 mt-3.5">
+                {slides.map((key, i) => (
+                  <button
+                    key={key}
+                    aria-label={`Slide ${i + 1}`}
+                    onClick={() => {
+                      const el = carouselRef.current;
+                      if (el) el.scrollTo({ left: i * el.clientWidth, behavior: 'smooth' });
+                    }}
+                    className="w-[7px] h-[7px] rounded-full"
+                    style={{
+                      background: i === activeSlide ? COLORS.textPrimary : '#c7c7cc',
+                    }}
+                  />
+                ))}
+              </div>
+            )}
           </>
         )}
 
@@ -294,6 +327,7 @@ export function HomeScreen({
               eligible={Boolean(txn.flexEligible) && !flexedIds.has(txn.id)}
               flexed={flexedIds.has(txn.id)}
               onFlex={onFlexTxn}
+              cashbackByTxn={cashback?.byFeedTxn}
             />
           ))}
 
@@ -305,45 +339,12 @@ export function HomeScreen({
             Show all
           </button>
         </Card>
+
+        {/* Smart Card, once linked: the vault follows the transactions that fill it. */}
+        {cashback && <VaultWidget ledger={cashback} onOpen={() => onNavigate('rewards')} />}
       </div>
 
-      {/* Floating tab bar */}
-      <div className="absolute left-0 right-0 bottom-6 flex justify-center pointer-events-none">
-        <div
-          className="flex items-center gap-1 p-1.5 rounded-full pointer-events-auto backdrop-blur-xl"
-          style={{
-            background: 'rgba(244,244,247,0.82)',
-            boxShadow:
-              'inset 0 0 0 1px rgba(255,255,255,0.9), 0 4px 18px rgba(0,0,0,0.08)',
-          }}
-        >
-          <div
-            className="flex items-center gap-2 pl-6 pr-7 py-3 rounded-full"
-            style={{ background: 'rgba(0,0,0,0.06)' }}
-          >
-            <HomeIcon />
-            <span
-              className="text-[15px] font-bold"
-              style={{ color: COLORS.textPrimary }}
-            >
-              Home
-            </span>
-          </div>
-
-          <button
-            onClick={onNavigateBills}
-            className="flex items-center gap-2 pl-6 pr-7 py-3 rounded-full"
-          >
-            <BillsIcon />
-            <span
-              className="text-[15px] font-medium"
-              style={{ color: COLORS.textSecondary }}
-            >
-              Bills
-            </span>
-          </button>
-        </div>
-      </div>
+      <TabBar active="home" onNavigate={onNavigate} rewardsBadge={!cashback} />
 
       {/* Home indicator */}
       <div

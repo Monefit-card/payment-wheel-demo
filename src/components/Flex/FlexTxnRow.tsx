@@ -4,6 +4,8 @@ import { IconFlex } from '@/components/ui/icons';
 import { MerchantLogo } from '@/components/ui/MerchantLogo';
 import { COLORS } from '@/lib/constants';
 import { Txn } from '@/types/app';
+import { CashbackTag } from '@/components/Rewards/CashbackTag';
+import { EarnedPurchase } from '@/lib/smartsaver';
 import { txnAmount } from './format';
 
 /**
@@ -61,6 +63,11 @@ interface FlexTxnRowProps {
    */
   eligibleIds?: ReadonlySet<string>;
   flexedIds?: ReadonlySet<string>;
+  /**
+   * Smart Card cashback, keyed by transaction id. Only purchases made after
+   * the SmartSaver link are in it, so older rows show nothing.
+   */
+  cashbackByTxn?: ReadonlyMap<string, EarnedPurchase>;
 }
 
 /**
@@ -76,7 +83,9 @@ export function FlexTxnRow({
   flexed: flexedProp,
   eligibleIds,
   flexedIds,
+  cashbackByTxn,
 }: FlexTxnRowProps) {
+  const cashback = cashbackByTxn?.get(txn.id);
   const eligible = eligibleProp ?? eligibleIds?.has(txn.id) ?? false;
   const flexed = flexedProp ?? flexedIds?.has(txn.id) ?? false;
 
@@ -101,6 +110,7 @@ export function FlexTxnRow({
               {txn.fx}
             </div>
           )}
+          {cashback && <CashbackTag purchase={cashback} />}
         </div>
       </div>
 

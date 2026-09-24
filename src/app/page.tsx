@@ -10,20 +10,25 @@ import { BillsScreen } from '@/components/Bills/BillsScreen';
 import { FlexFlow } from '@/components/Flex/FlexFlow';
 import { FlexTransactionsPage } from '@/components/Flex/FlexTransactionsPage';
 import { FlexIntroStory } from '@/components/Flex/FlexIntroStory';
+import { RewardsScreen } from '@/components/Rewards/RewardsScreen';
+import { LinkFlow, LinkMode } from '@/components/Rewards/LinkFlow';
+import { Tab } from '@/components/ui/TabBar';
 import { useAppState } from '@/hooks/useAppState';
+import { useSmartSaver } from '@/hooks/useSmartSaver';
 import { usePaymentState } from '@/hooks/usePaymentState';
 import { flexedTxnIds } from '@/lib/flex-math';
 
 /**
- * `home` and `bills` are TABS — peers at the same depth. `wheel` and `confirm`
+ * `home`, `bills` and `rewards` are TABS — peers at the same depth. `wheel` and `confirm`
  * sit deeper, pushed on top of whichever tab launched them.
  */
-type Screen = 'home' | 'bills' | 'wheel' | 'confirm';
+type Screen = Tab | 'wheel' | 'confirm';
 
 /** Navigation depth. Tabs share depth 0, so a tab switch is never a push. */
 const SCREEN_DEPTH: Record<Screen, number> = {
   home: 0,
   bills: 0,
+  rewards: 0,
   wheel: 1,
   confirm: 2,
 };
@@ -120,6 +125,15 @@ export default function Home() {
     onAccountStateChange: app.overrideAccount,
   });
 
+  const ss = useSmartSaver(app.scenario.transactions);
+  const [linkMode, setLinkMode] = useState<LinkMode | null>(null);
+
+  /** Last month's card spend — the most recent paid bill — sizes the offer's estimate. */
+  const lastMonthSpend = useMemo(() => {
+    const paid = app.scenario.months.filter((m) => m.state !== 'upcoming' && m.key !== app.scenario.currentMonthKey);
+    return paid.length ? paid[paid.length - 1].spent : app.summary.currentBill.spent;
+  }, [app.scenario, app.summary.currentBill.spent]);
+
   const [screen, setScreen] = useState<Screen>('home');
   // Which way the next transition slides: forward pushes in from the right.
   const [direction, setDirection] = useState(1);
@@ -207,7 +221,7 @@ export default function Home() {
     go('home');
   }, [app, paymentState.selectedAmount, go]);
 
-  const isHome = screen === 'home' || screen === 'bills';
+  const isHome = screen === 'home' || screen === 'bills' || screen === 'rewards';
 
   return (
     <main
@@ -263,7 +277,8 @@ export default function Home() {
                   scenario={app.scenario}
                   summary={app.summary}
                   onPay={() => go('wheel')}
-                  onNavigateBills={() => go('bills')}
+                  onNavigate={go}
+                  cashback={ss.ledger}
                   onOpenFlex={() => openFlex()}
                   onOpenTransactions={() => setTxnsOpen(true)}
                   onFlexTxn={openFlex}
@@ -275,7 +290,19 @@ export default function Home() {
                   scenario={app.scenario}
                   summary={app.summary}
                   onPay={() => go('wheel')}
-                  onNavigateHome={() => go('home')}
+                  onNavigate={go}
+                  rewardsBadge={!ss.ledger}
+                />
+              )}
+
+              {screen === 'rewards' && (
+                <RewardsScreen
+                  ss={ss}
+                  lastMonthSpend={lastMonthSpend}
+                  onNavigate={go}
+                  onLinkMatched={() => setLinkMode('login_match')}
+                  onLoginOther={() => setLinkMode('login_other')}
+                  onOpenAccount={() => setLinkMode('open')}
                 />
               )}
 
@@ -307,6 +334,7 @@ export default function Home() {
             txns={app.scenario.transactions}
             eligibleIds={new Set(eligibleTxns.map((t) => t.id))}
             flexedIds={flexedIds}
+            cashbackByTxn={ss.ledger?.byFeedTxn}
             onFlex={flexFromTxnsPage}
             onBack={() => setTxnsOpen(false)}
           />
@@ -329,10 +357,24 @@ export default function Home() {
         )}
 
         {introOpen && <FlexIntroStory onDone={finishIntro} />}
+
+        {linkMode && (
+          <LinkFlow
+            mode={linkMode}
+            onLink={ss.link}
+            onOpenAndLink={ss.openAndLink}
+            onClose={() => setLinkMode(null)}
+            onDone={() => {
+              setLinkMode(null);
+              go('rewards');
+            }}
+          />
+        )}
       </div>
 
       <AdminPanel
         app={app}
+        smartSaver={ss}
         wheelMinimum={paymentState.minimumPayment}
         onApplyPreset={paymentState.applyPreset}
       />

@@ -4,6 +4,7 @@ import { Card } from '@/components/ui/Card';
 import { FullScreenOverlay } from '@/components/ui/FullScreenOverlay';
 import { COLORS } from '@/lib/constants';
 import { Txn } from '@/types/app';
+import { EarnedPurchase } from '@/lib/smartsaver';
 import { FlexTxnRow } from './FlexTxnRow';
 import { groupTxnsByDay } from './format';
 
@@ -14,6 +15,7 @@ interface FlexTransactionsPageProps {
   onFlex: (txnId: string) => void;
   eligibleIds: ReadonlySet<string>;
   flexedIds: ReadonlySet<string>;
+  cashbackByTxn?: ReadonlyMap<string, EarnedPurchase>;
   zIndex?: number;
 }
 
@@ -27,6 +29,7 @@ export function FlexTransactionsPage({
   onFlex,
   eligibleIds,
   flexedIds,
+  cashbackByTxn,
   zIndex,
 }: FlexTransactionsPageProps) {
   return (
@@ -48,6 +51,7 @@ export function FlexTransactionsPage({
                 timeOnly
                 eligibleIds={eligibleIds}
                 flexedIds={flexedIds}
+                cashbackByTxn={cashbackByTxn}
               />
             ))}
           </Card>
