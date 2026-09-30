@@ -118,6 +118,14 @@ export function FlexPayoff({ plan, onBack, onPay }: FlexPayoffProps) {
         />
       </Card>
 
+      <div
+        className="text-xs text-center leading-[1.45] px-3 pt-4"
+        style={{ color: COLORS.labelMuted }}
+      >
+        Your repayment lowers every remaining instalment by the same amount.
+        Your payment dates stay the same.
+      </div>
+
       <Sheet
         isOpen={savedInfoOpen}
         onClose={() => setSavedInfoOpen(false)}
