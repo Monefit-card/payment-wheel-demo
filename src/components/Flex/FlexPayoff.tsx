@@ -17,7 +17,6 @@ import { formatInstalmentDue, planPayoffQuote, planPrepayment } from '@/lib/flex
 import { formatEuro } from '@/lib/payment-math';
 import { FlexPlan, Instalment } from '@/types/app';
 import { PlanRow } from './PlanOverview';
-import { TxnCard } from './TxnCard';
 
 interface FlexPayoffProps {
   plan: FlexPlan;
@@ -72,11 +71,7 @@ export function FlexPayoff({ plan, onBack, onPay }: FlexPayoffProps) {
         </>
       }
     >
-      {plan.items.map((item) => (
-        <TxnCard key={item.id} txn={item} />
-      ))}
-
-      <Card className="px-5 pt-6 pb-5">
+      <Card className="px-5 pt-6 pb-5 mt-3.5">
         <div className="text-center mb-[26px]">
           <div className="text-[13px] mb-1.5" style={{ color: COLORS.labelMuted }}>
             You pay
