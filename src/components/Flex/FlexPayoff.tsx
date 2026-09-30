@@ -13,7 +13,7 @@ import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { Sheet } from '@/components/ui/Sheet';
 import { IconInfo } from '@/components/ui/icons';
 import { COLORS } from '@/lib/constants';
-import { formatInstalmentDue, planPayoffQuote, planPrepayment } from '@/lib/flex-math';
+import { formatInstalmentDue, planPayoffQuote, planPrepayment, round2 } from '@/lib/flex-math';
 import { formatEuro } from '@/lib/payment-math';
 import { FlexPlan, Instalment } from '@/types/app';
 import { PlanRow } from './PlanOverview';
@@ -161,12 +161,14 @@ function Changed({ now, was }: { now: number; was: number }) {
 }
 
 /**
- * The schedule as it will stand: the instalments still to come at their new
- * amount, with the old one struck through once the payment moves it. The monthly
- * ones are equal, so they read as one row; the final one absorbs the
- * rounding, so it keeps its own.
+ * The schedule as it will stand, in `PlanOverview`'s structure: the instalments
+ * before the final one collapse into one "Nx instalments" row (their total,
+ * expandable), then the final instalment. New amounts sit over the old ones,
+ * struck through once the payment moves them.
  */
 function PayoffSchedule({ before, after }: { before: Instalment[]; after: Instalment[] }) {
+  const [open, setOpen] = useState(false);
+
   const unpaid = before
     .map((instalment, i) => ({ was: instalment, now: after[i] }))
     .filter(({ was }) => was.state === 'due' || was.state === 'upcoming');
@@ -175,19 +177,36 @@ function PayoffSchedule({ before, after }: { before: Instalment[]; after: Instal
   // A paid-off instalment keeps its scheduled amount on the record; what's
   // left to pay on it is nothing.
   const newAmount = (now: Instalment) => (now.state === 'paid' ? 0 : now.amount);
-  const monthly = unpaid.slice(0, -1);
+  const middle = unpaid.slice(0, -1);
   const final = unpaid[unpaid.length - 1];
+  const middleNow = round2(middle.reduce((sum, i) => sum + newAmount(i.now), 0));
+  const middleWas = round2(middle.reduce((sum, i) => sum + i.was.amount, 0));
 
   return (
     <Card className="px-4 py-[18px]">
-      {monthly.length > 0 && (
-        <PlanRow
-          line
-          title="Monthly instalment"
-          sub={`${monthly.length} payment${monthly.length > 1 ? 's' : ''} from ${formatInstalmentDue(monthly[0].was.date)}`}
-          amount={<Changed now={newAmount(monthly[0].now)} was={monthly[0].was.amount} />}
-        />
-      )}
+      {middle.length > 0 &&
+        (open ? (
+          middle.map(({ was, now }, i) => (
+            <PlanRow
+              key={was.n}
+              line
+              title={`Instalment ${was.n}`}
+              sub={`Due ${formatInstalmentDue(was.date)}`}
+              amount={<Changed now={newAmount(now)} was={was.amount} />}
+              onClick={() => setOpen(false)}
+              chevron={i === 0 ? 'up' : undefined}
+            />
+          ))
+        ) : (
+          <PlanRow
+            line
+            title={`${middle.length}x instalment${middle.length > 1 ? 's' : ''}`}
+            sub="Due by the 15th of following months"
+            amount={<Changed now={middleNow} was={middleWas} />}
+            onClick={() => setOpen(true)}
+            chevron="down"
+          />
+        ))}
       <PlanRow
         title="Final instalment"
         sub={`Due ${formatInstalmentDue(final.was.date)}`}
