@@ -26,7 +26,7 @@ interface FlexPayoffProps {
 }
 
 /**
- * Paying one plan off early — laid out as the instalment chooser is.
+ * Repaying one plan — laid out as the instalment chooser is.
  *
  * The slider picks the payment, from €0 up to paying the plan off in full.
  * Below it, the schedule as it will stand, then the interest saved. Whatever the amount, it lands one way: principal first, spread
@@ -49,7 +49,7 @@ export function FlexPayoff({ plan, onBack, onPay }: FlexPayoffProps) {
 
   return (
     <FullScreenOverlay
-      centerTitle="Pay off early"
+      centerTitle="Repayment"
       onBack={onBack}
       footer={
         <>

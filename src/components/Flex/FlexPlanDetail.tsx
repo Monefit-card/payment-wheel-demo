@@ -22,7 +22,7 @@ interface FlexPlanDetailProps {
   /** True when this period's minimum has been paid. */
   minimumPaid: boolean;
   onBack: () => void;
-  /** Opens the early payoff for this plan. */
+  /** Opens the repayment screen for this plan. */
   onPayoff: () => void;
   /** Converts the plan's remaining balance back to Credit. */
   onClosePlan: (id: string) => void;
@@ -64,7 +64,7 @@ export function FlexPlanDetail({
       }
       footer={
         <>
-          <PrimaryButton onClick={onPayoff}>Pay off early</PrimaryButton>
+          <PrimaryButton onClick={onPayoff}>Repayment</PrimaryButton>
           <div className="h-2.5" />
           <PrimaryButton variant="light" onClick={() => setCloseOpen(true)}>
             Close Flex
@@ -152,7 +152,7 @@ export function FlexPlanDetail({
                 onPayoff();
               }}
             >
-              Pay off early
+              Repayment
             </PrimaryButton>
             <div className="h-2.5" />
             <PrimaryButton variant="light" onClick={() => setCloseOpen(false)}>
