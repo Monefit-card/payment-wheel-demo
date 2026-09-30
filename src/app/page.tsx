@@ -339,7 +339,7 @@ export default function Home() {
             eligibleTxns={eligibleTxns}
             onCreate={({ txnIds, n }) => app.createFlexPlan({ txnIds, n })}
             onCancelPlan={app.cancelFlexPlan}
-            onPayoffInstalments={app.payoffInstalments}
+            onPayoffPlan={app.payoffPlan}
             accountBlocked={app.scenario.accountBlocked}
             minimumPaid={app.summary.currentBill.minPaid === true}
             onClose={() => setFlexFlow(null)}

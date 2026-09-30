@@ -6,7 +6,7 @@ import { FlexPlan, Txn } from '@/types/app';
 import { FlexIntroStory } from './FlexIntroStory';
 import { FlexPicker } from './FlexPicker';
 import { FlexPlanDetail } from './FlexPlanDetail';
-import { FlexPayoffWheel } from './FlexPayoffWheel';
+import { FlexPayoff } from './FlexPayoff';
 import { FlexPlanList } from './FlexPlanList';
 import { InstalmentChooser } from './InstalmentChooser';
 import { PlanCreated } from './PlanCreated';
@@ -37,8 +37,8 @@ export interface FlexFlowProps {
   onCreate: (input: { txnIds: string[]; n: number }) => void;
   /** Converts a plan's remaining balance back to Credit. */
   onCancelPlan: (id: string) => void;
-  /** Clears the next `count` upcoming instalments early. */
-  onPayoffInstalments: (id: string, count: number) => void;
+  /** An early payment on one plan — principal first, spread across its instalments. */
+  onPayoffPlan: (id: string, amount: number) => void;
   /** Account frozen for a missed minimum — blocks closing a plan. */
   accountBlocked: boolean;
   /** This period's minimum has been paid. */
@@ -62,7 +62,7 @@ export function FlexFlow({
   eligibleTxns,
   onCreate,
   onCancelPlan,
-  onPayoffInstalments,
+  onPayoffPlan,
   accountBlocked,
   minimumPaid,
   onClose,
@@ -118,13 +118,13 @@ export function FlexFlow({
           />
 
           {payoffOpen && (
-            <FlexPayoffWheel
+            <FlexPayoff
               plan={selectedPlan}
               onBack={() => setPayoffOpen(false)}
-              onPay={(count) => {
+              onPay={(amount) => {
                 setPayoffOpen(false);
                 setSelectedPlanId(null);
-                onPayoffInstalments(selectedPlan.id, count);
+                onPayoffPlan(selectedPlan.id, amount);
               }}
             />
           )}

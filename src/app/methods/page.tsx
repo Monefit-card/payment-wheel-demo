@@ -2,10 +2,12 @@
 
 import { useMemo, useState } from 'react';
 import {
+  amortisationRows,
   buildSchedule,
   calcPlan,
-  payoffStops,
   planLabel,
+  planPrepayment,
+  planPayoffQuote,
   round2,
   spreadAcrossPlans,
 } from '@/lib/flex-math';
@@ -13,17 +15,19 @@ import { calculateMinimumPayment, formatEuro } from '@/lib/payment-math';
 import { FlexPlan } from '@/types/app';
 
 /**
- * Engineering reference — Flex repayments on two axes.
+ * Engineering reference — where a Flex repayment lands.
  *
- * ROW  where the money lands: inside the minimum payment (due instalments
- *      only) or outside it (future instalments only).
- * COL  how it lands: spread across instalments, or settling whole ones.
+ * Inside the minimum, every part is paid down in the same proportion. Outside
+ * it — above the card balance on the main wheel, or on one plan from Flex —
+ * money goes to principal first, spread across every upcoming instalment.
  *
- * Every figure comes from the functions the app calls — `spreadPayment` and
- * `payoffStops` — so the page can't show behaviour the build doesn't have.
+ * Every figure comes from the functions the app calls — `spreadAcrossPlans`
+ * and `planPrepayment` — so the page can't show behaviour the build doesn't
+ * have.
  *
  * The bars are the explanation: grey is what was scheduled, colour is what it
- * is now. Spreading shortens bars; clearing removes them.
+ * is now. Paying shortens bars; a bar is only removed once its plan's
+ * principal is gone.
  */
 
 const INK = '#131417';
@@ -33,6 +37,8 @@ const RULE = 'rgba(19,20,23,0.10)';
 const GHOST = '#dcdce2';
 const ACTIVE = '#3f34c9';
 const DUE = '#fa9a2e';
+/** The interest slice of a due instalment — paid after its principal. */
+const DUE_INTEREST = '#fdd09a';
 const RED = '#a7121f';
 const CREDIT = '#131417';
 
@@ -49,6 +55,11 @@ interface Bar {
   due?: boolean;
   /** The credit half of the minimum. */
   credit?: boolean;
+  /**
+   * The part of `after` that is interest, drawn under the principal. Principal
+   * sits on top because it is paid first, so the bar drains from the top.
+   */
+  afterInterest?: number;
 }
 
 function Chart({ bars, max }: { bars: Bar[]; max: number }) {
@@ -66,14 +77,29 @@ function Chart({ bars, max }: { bars: Bar[]; max: number }) {
                 style={{ height: h(bar.before), background: GHOST }}
               />
               {!cleared ? (
-                <div
-                  className="absolute bottom-0 left-0 right-0 rounded-[4px]"
-                  style={{
-                    height: h(bar.after ?? bar.before),
-                    background: bar.credit ? CREDIT : bar.due ? DUE : ACTIVE,
-                    transition: 'height 0.18s ease',
-                  }}
-                />
+                <>
+                  <div
+                    className="absolute bottom-0 left-0 right-0 rounded-[4px]"
+                    style={{
+                      height: h(bar.after ?? bar.before),
+                      background: bar.credit ? CREDIT : bar.due ? DUE : ACTIVE,
+                      transition: 'height 0.18s ease',
+                    }}
+                  />
+                  {bar.afterInterest !== undefined && bar.afterInterest > 0 && (
+                    <div
+                      className="absolute bottom-0 left-0 right-0 rounded-[4px]"
+                      style={{
+                        height: Math.min(
+                          h(bar.after ?? bar.before),
+                          (bar.afterInterest / max) * BAR_H,
+                        ),
+                        background: DUE_INTEREST,
+                        transition: 'height 0.18s ease',
+                      }}
+                    />
+                  )}
+                </>
               ) : (
                 <div
                   className="absolute left-0 right-0"
@@ -276,15 +302,24 @@ export default function RepaymentMethodsPage() {
     [],
   );
 
-  /* ── Inside the minimum: credit portion first, then the due instalments ── */
+  /* ── Inside the minimum: every part paid down together ─────────────── */
 
-  /** The credit half of the minimum — 5% of the card bill, on a €700 balance. */
+  /** The credit part of the minimum — 5% of the card bill, on a €700 balance. */
   const creditPortion = calculateMinimumPayment(700, 0);
 
-  const dues = plans.map((plan) => ({
-    plan,
-    amount: plan.instalments.find((i) => i.state === 'due')?.amount ?? 0,
-  }));
+  /** Each plan's due instalment, split into the principal and interest it carries. */
+  const dues = plans.map((plan) => {
+    const instalment = plan.instalments.find((i) => i.state === 'due');
+    const row = instalment
+      ? amortisationRows(plan.amount, plan.n)[instalment.n - 1]
+      : undefined;
+    return {
+      plan,
+      amount: instalment?.amount ?? 0,
+      principal: row?.principal ?? 0,
+      interest: row?.interest ?? 0,
+    };
+  });
   const flexPortion = round2(dues.reduce((sum, d) => sum + d.amount, 0));
   const minimum = round2(creditPortion + flexPortion);
   const barMax = Math.max(creditPortion, ...dues.map((d) => d.amount));
@@ -292,33 +327,40 @@ export default function RepaymentMethodsPage() {
   const [paidRaw, setPaid] = useState(() => Math.round(minimum * 0.55));
   const paid = Math.min(paidRaw, minimum);
 
-  /** Credit principal is satisfied before anything reaches Flex. */
-  const toCredit = round2(Math.min(paid, creditPortion));
-  const toFlex = round2(Math.max(0, paid - creditPortion));
   /**
-   * Proportional, not equal chunks. Reducing each due instalment by the same
-   * euro amount would zero the smallest one first and leave the remainder with
-   * nowhere to go; taking the same *share* off each means they all reach zero
-   * together, exactly when the Flex portion is covered.
+   * One share for every part of the minimum. Credit first, or equal euro
+   * chunks, would clear some parts before others; taking the same share off
+   * each means they all reach zero together, exactly when the minimum is met.
    */
-  const clearedShare = flexPortion > 0 ? toFlex / flexPortion : 0;
+  const share = minimum > 0 ? paid / minimum : 0;
+  const toCredit = round2(creditPortion * share);
+  const toFlex = round2(paid - toCredit);
   const shortfall = round2(Math.max(0, minimum - paid));
+
+  /** Within an instalment, its share clears principal before interest. */
+  const dueBar = (d: (typeof dues)[number]): Bar => {
+    const onIt = d.amount * share;
+    const principalLeft = Math.max(0, d.principal - onIt);
+    const interestLeft = Math.max(0, d.interest - Math.max(0, onIt - d.principal));
+    return {
+      key: d.plan.id,
+      label: d.plan.items[0]?.merchant ?? d.plan.id,
+      before: d.amount,
+      after: round2(principalLeft + interestLeft),
+      afterInterest: round2(interestLeft),
+      due: true,
+    };
+  };
 
   const insideSpreadBars: Bar[] = [
     {
       key: 'credit',
-      label: 'Credit',
+      label: 'Card',
       before: creditPortion,
       after: round2(creditPortion - toCredit),
       credit: true,
     },
-    ...dues.map((d) => ({
-      key: d.plan.id,
-      label: d.plan.items[0]?.merchant ?? d.plan.id,
-      before: d.amount,
-      after: round2(d.amount * (1 - clearedShare)),
-      due: true,
-    })),
+    ...dues.map(dueBar),
   ];
 
   /* ── Above the card balance: every plan's future instalments ─────────── */
@@ -367,28 +409,26 @@ export default function RepaymentMethodsPage() {
     });
   };
 
-  /* ── Flex's own wheel: whole instalments, one plan ────────────────────── */
+  /* ── One plan's early payoff, from Flex ──────────────────────────────── */
 
   const plan = plans[0];
   const months = plan.instalments.map((i) => i.date.split(' ')[1]);
   const planMax = Math.max(...plan.instalments.map((i) => i.amount));
 
-  const flexStops = payoffStops(plan);
-  const [count, setCount] = useState(3);
-  const stop = flexStops.find((s) => s.count === count) ?? flexStops[0];
-  const clearedIds = new Set(
-    plan.instalments
-      .filter((i) => i.state === 'due' || i.state === 'upcoming')
-      .slice(0, count)
-      .map((i) => i.n),
-  );
-  const outsideClearBars: Bar[] = plan.instalments.map((instalment, i) => ({
-    key: String(instalment.n),
-    label: months[i],
-    before: instalment.amount,
-    due: instalment.state === 'due',
-    after: clearedIds.has(instalment.n) ? null : instalment.amount,
-  }));
+  const payoff = planPayoffQuote(plan);
+  const payoffMax = Math.ceil(payoff.total);
+  const [payoffRaw, setPayoffRaw] = useState(() => Math.round(payoff.total * 0.5));
+  const prepay = planPrepayment(plan, payoffRaw >= payoffMax ? payoff.total : payoffRaw);
+  const payoffBars: Bar[] = plan.instalments.map((instalment, i) => {
+    const after = prepay.instalments[i];
+    return {
+      key: String(instalment.n),
+      label: months[i],
+      before: instalment.amount,
+      due: instalment.state === 'due',
+      after: after.state === 'paid' && instalment.state !== 'paid' ? null : after.amount,
+    };
+  });
 
   return (
     <main className="min-h-dvh px-6 py-14" style={{ background: '#f2f2f4' }}>
@@ -419,7 +459,7 @@ export default function RepaymentMethodsPage() {
 
         <RowHeading
           title="1 · Due instalments (inside the minimum payment)"
-          sub={`The minimum is ${formatEuro(creditPortion)} of credit plus ${formatEuro(flexPortion)} of due instalments, one per active plan. Credit is satisfied first; whatever is left over comes off every due instalment in the same proportion, so they all reach zero together.`}
+          sub={`The minimum is ${formatEuro(creditPortion)} of card minimum plus ${formatEuro(flexPortion)} of due instalments, one per active plan. A payment comes off every part in the same proportion, so they all reach zero together. Within each instalment, principal is paid first and interest second.`}
         />
 
         <div className="flex gap-4 flex-col lg:flex-row">
@@ -437,7 +477,8 @@ export default function RepaymentMethodsPage() {
             bars={insideSpreadBars}
             max={barMax}
             figures={[
-              { label: 'Reaches Flex', value: formatEuro(toFlex) },
+              { label: 'To the card', value: formatEuro(toCredit) },
+              { label: 'To Flex', value: formatEuro(toFlex) },
               {
                 label: 'Plans converting',
                 value: shortfall > 0 ? `${dues.length} of ${dues.length}` : '0',
@@ -446,7 +487,7 @@ export default function RepaymentMethodsPage() {
             ]}
             note={
               shortfall > 0
-                ? `${formatEuro(shortfall)} short. Every due instalment is still part-paid, so on this shortfall all ${dues.length} plans convert to Credit.`
+                ? `${formatEuro(shortfall)} short. Every part of the minimum is still part-paid, so on this shortfall all ${dues.length} plans convert to Credit. Light orange is instalment interest, left until its principal is paid.`
                 : 'Minimum met — no instalment is left unpaid, so nothing converts.'
             }
           />
@@ -521,31 +562,38 @@ export default function RepaymentMethodsPage() {
         </div>
 
         <RowHeading
-          title="Flex payment wheel"
-          sub="One methodology only: whole instalments, on one plan at a time. Exists per individual Flex for now."
+          title="Paying off one Flex early"
+          sub="Aimed at one plan: principal first, spread equally across every unpaid instalment — this month's included, so the minimum drops with it — then interest accrued since the statement. Paying in full clears the plan."
         />
 
         <div className="flex gap-4 flex-col lg:flex-row">
           <Panel
-            title="One plan, whole instalments"
-            lead="Settled next-first — the billed one included. Nothing falls due for the months cleared, and the instalment amount never changes."
+            title="One plan, principal first"
+            lead={`Pay off in full = ${formatEuro(payoff.principal)} principal left + ${formatEuro(payoff.accrued)} interest accrued since the statement. Every future euro of interest beyond that is forgiven.`}
             control={
               <Slider
-                label="Instalments cleared"
-                value={count}
-                display={`${count} of ${flexStops.length}`}
+                label="Payment on this plan"
+                value={Math.min(payoffRaw, payoffMax)}
+                display={`${formatEuro(prepay.amount)} of ${formatEuro(payoff.total)}`}
                 min={1}
-                max={flexStops.length}
-                onChange={setCount}
+                max={payoffMax}
+                onChange={setPayoffRaw}
               />
             }
-            bars={outsideClearBars}
+            bars={payoffBars}
             max={planMax}
             figures={[
-              { label: 'You pay', value: formatEuro(stop?.amount ?? 0) },
-              { label: 'Interest saved', value: formatEuro(stop?.saved ?? 0), tone: 'positive' },
+              {
+                label: 'Each instalment',
+                value:
+                  prepay.monthlyAfter > 0
+                    ? `${formatEuro(prepay.monthlyBefore)} → ${formatEuro(prepay.monthlyAfter)}`
+                    : 'Paid off',
+              },
+              { label: 'To interest', value: formatEuro(prepay.toInterest) },
+              { label: 'Interest saved', value: formatEuro(prepay.saved), tone: 'positive' },
             ]}
-            note="The billed instalment costs its full amount; upcoming ones cost principal only, so their unearned interest is forgiven. Clearing the billed one takes it out of the minimum, which is what keeps the plan out of a conversion."
+            note="The billed instalment shrinks with the rest, and the minimum with it. Accrued interest is only reached once every instalment is at zero."
           />
         </div>
 
@@ -562,17 +610,17 @@ export default function RepaymentMethodsPage() {
           <p className="text-[15px] leading-[1.6] mt-2" style={{ color: INK }}>
             Every unpaid Flex instalment converts to Credit at the credit
             line’s higher rate, backdated over the period elapsed. Spreading
-            protects nothing: it takes the same amount off every due instalment
-            rather than settling any, so a shortfall leaves all of them unpaid
-            and <strong>every plan converts</strong>. Clearing one plan’s due
-            instalment in Flex — the top-right box — is the only way to protect
-            it.
+            protects nothing: it takes the same share off every part of the
+            minimum rather than settling any, so a shortfall leaves all of them unpaid
+            and <strong>every plan converts</strong>. Paying a plan off early
+            in full takes its instalment out of the minimum, which is the one
+            way to protect it.
           </p>
         </div>
 
         <div className="text-[13px] mt-7" style={{ color: FAINT }}>
           Source: src/lib/flex-math.ts — spreadAcrossPlans(), spreadPayment(),
-          payoffStops()
+          planPayoffQuote(), planPrepayment()
         </div>
       </div>
     </main>

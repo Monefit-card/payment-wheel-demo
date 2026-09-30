@@ -12,6 +12,7 @@ import {
 } from '@/lib/derive-account';
 import {
   applySpreadToPlans,
+  planPrepayment,
   buildSchedule,
   calcPlan,
   formatPlanDate,
@@ -166,25 +167,31 @@ export function useAppState(initialKey: ScenarioKey = DEFAULT_SCENARIO_KEY) {
   );
 
   /**
-   * Pay off the next `count` unpaid instalments — the one on this period's
-   * bill included, since paying it here simply removes it from the minimum.
-   *
-   * Early repayment forgives the interest that hasn't accrued, so an upcoming
-   * instalment costs its principal only — see `flexSettlementQuote`. Clearing
-   * the last one settles the plan.
+   * An early payment on one plan (see `planPrepayment`). Principal comes off
+   * every unpaid instalment alike — this period's included, which lowers the
+   * minimum — and the remainder settles the interest accrued since the
+   * statement. Paying the whole quote settles the plan.
    */
-  const payoffInstalments = useCallback(
-    (id: string, count: number) => {
+  const payoffPlan = useCallback(
+    (id: string, amount: number) => {
       update((draft) => {
         const plan = draft.flexPlans.find((p) => p.id === id);
         if (!plan) return;
 
-        const unpaid = plan.instalments.filter(
-          (i) => i.state === 'due' || i.state === 'upcoming',
-        );
-        unpaid.slice(0, count).forEach((i) => {
-          i.state = 'paid';
-        });
+        const outcome = planPrepayment(plan, amount);
+        // What the plan costs now: instalments already paid, this payment, and
+        // whatever is still scheduled — so a payoff shows the interest it saved.
+        const paidBefore = plan.instalments
+          .filter((i) => i.state === 'paid')
+          .reduce((sum, i) => sum + i.amount, 0);
+        const stillDue = outcome.instalments
+          .filter((i) => i.state === 'due' || i.state === 'upcoming')
+          .reduce((sum, i) => sum + i.amount, 0);
+        plan.total = round2(paidBefore + outcome.amount + stillDue);
+        plan.interest = round2(plan.total - plan.amount);
+        plan.instalments = outcome.instalments;
+        plan.monthly = outcome.monthlyAfter;
+        plan.last = outcome.instalments.filter((i) => i.state !== 'paid').at(-1)?.amount ?? 0;
 
         const settled = plan.instalments.every((i) => i.state === 'paid');
         if (!settled) return;
@@ -313,7 +320,7 @@ export function useAppState(initialKey: ScenarioKey = DEFAULT_SCENARIO_KEY) {
     resetOverrides,
     createFlexPlan,
     cancelFlexPlan,
-    payoffInstalments,
+    payoffPlan,
     applyPayment,
     markFlexIntroSeen,
   };

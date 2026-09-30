@@ -93,12 +93,7 @@ export function getPaymentZone(
   amount: number,
   minimumPayment: number,
   dueBalance: number,
-  totalBalance: number,
-  /**
-   * The credit-line slice of the minimum, when the minimum is shown split
-   * (see `splitMinimum` in `usePaymentState`). Zero means no split anchor.
-   */
-  creditMinimum: number = 0
+  totalBalance: number
 ): PaymentZone {
   if (totalBalance <= 0) return 'at_zero';
 
@@ -132,24 +127,8 @@ export function getPaymentZone(
   const minInRange = minDist < snapRange;
   const dueInRange = dueDist < snapRange;
 
-  // The credit/instalment split inside the minimum. Only a distinct anchor
-  // while it clears the minimum's own snap window — otherwise the two dots
-  // would fight over the same stretch of arc.
-  const creditSplit = creditMinimum > 0 && creditMinimum < minimumPayment - snapRange;
-  const creditDist = creditSplit ? Math.abs(amount - creditMinimum) : Infinity;
-  if (creditDist < snapRange && creditDist <= minDist && creditDist <= dueDist) {
-    return 'at_credit_minimum';
-  }
-
   if (minInRange && (!dueInRange || minDist <= dueDist)) return 'at_minimum';
   if (dueInRange) return 'at_due';
-
-  // Between the two halves of the minimum: the credit portion is covered and
-  // the due instalments are being paid into. Only below the credit minimum is
-  // the payment short of everything.
-  if (creditSplit && amount > creditMinimum && amount < minimumPayment) {
-    return 'between_credit_min_min';
-  }
 
   if (minimumPayment > 0 && amount < minimumPayment) return 'below_minimum';
   if (amount < dueBalance) return 'between_min_due';
@@ -216,23 +195,6 @@ export function getZoneInfo(zone: PaymentZone, opts?: ZoneInfoOpts): ZoneInfo {
         zone,
         title: 'Below minimum',
         description: `Pay a little more by ${dueDate} to keep your account active.`,
-      };
-
-    // Deliberately titled as below_minimum is: this stop covers the credit
-    // line's own minimum, but the minimum payment is the whole of it. Naming
-    // it "credit minimum" would read as a minimum the customer can settle at.
-    case 'at_credit_minimum':
-      return {
-        zone,
-        title: 'Below minimum',
-        description: `This covers your credit line, but not the Flex instalments due by ${dueDate}. Pay a little more to meet your minimum.`,
-      };
-
-    case 'between_credit_min_min':
-      return {
-        zone,
-        title: 'Due instalments',
-        description: `Your credit line is covered and this is going to the Flex instalments due by ${dueDate}. Cover them all to meet your minimum.`,
       };
 
     case 'at_minimum':
@@ -316,12 +278,17 @@ export function getZoneInfo(zone: PaymentZone, opts?: ZoneInfoOpts): ZoneInfo {
  * focuses on what each stage *means* rather than what to do this period.
  */
 /**
- * The Flex sentence, shown only on the minimum-payment stage — that's the one
- * figure a user can't reconcile without being told.
+ * The Flex sentence. On the minimum it names the instalments inside the
+ * figure; below it, it says how a short payment is shared out — pro-rata
+ * across every part of the minimum, so no part is covered before the rest.
  */
 function flexEducationClause(zone: PaymentZone, flexDue: number): string {
-  if (flexDue <= 0 || zone !== 'at_minimum') return '';
-  return ' Your minimum includes Flex instalments due this period.';
+  if (flexDue <= 0) return '';
+  if (zone === 'at_minimum') return ' Your minimum includes Flex instalments due this period.';
+  if (zone === 'below_minimum') {
+    return ' Your minimum includes Flex instalments due this period, and a payment short of it comes off your card and each instalment in the same proportion — so none of them is covered until all of them are.';
+  }
+  return '';
 }
 
 export function getZoneEducation(zone: PaymentZone, opts?: ZoneInfoOpts): string {
@@ -341,12 +308,6 @@ export function getZoneEducation(zone: PaymentZone, opts?: ZoneInfoOpts): string
 
     case 'below_minimum':
       return "This is less than the minimum payment required to keep your account in good standing. Falling short risks late fees and can get your card blocked." + flexClause;
-
-    case 'at_credit_minimum':
-      return `Enough for your credit line's own minimum, but not for your minimum payment — that also includes the ${formatEuro(flexDue)} of Flex instalments due this period. Anything short of both counts as a missed minimum, which risks late fees and can get your card blocked.`;
-
-    case 'between_credit_min_min':
-      return `Your credit line's minimum is covered and this is going toward the ${formatEuro(flexDue)} of Flex instalments due this period. It comes off all of them in the same proportion, so none is settled until they all are — and until then this is still below your minimum payment.`;
 
     case 'at_minimum':
       return "The smallest amount you can pay this period to keep your card active. Anything left unpaid rolls forward and starts accruing interest until it's cleared." + flexClause;

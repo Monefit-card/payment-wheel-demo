@@ -105,17 +105,6 @@ export function usePaymentState(app?: PaymentAppInput) {
     flexDueAmount,
   ]);
 
-  /**
-   * The credit-line slice of the minimum — the anchor that separates it from
-   * the due instalments sitting on top. Zero when there are no due
-   * instalments, or when the credit portion is the whole minimum.
-   */
-  const creditMinimum = useMemo(() => {
-    if (flexDueAmount <= 0 || minimumPayment <= 0) return 0;
-    const credit = round2(minimumPayment - flexDueAmount);
-    return credit > 0 ? credit : 0;
-  }, [flexDueAmount, minimumPayment]);
-
   const isZeroBalance = accountState.totalBalance <= 0;
   const canPay = accountState.totalBalance > 0;
 
@@ -188,7 +177,6 @@ export function usePaymentState(app?: PaymentAppInput) {
       minimumPayment,
       accountState.dueBalance,
       accountState.totalBalance,
-      creditMinimum,
     );
   }, [
     clampedAmount,
@@ -197,7 +185,6 @@ export function usePaymentState(app?: PaymentAppInput) {
     accountState.totalBalance,
     flexSettlementAmount,
     settlementTotal,
-    creditMinimum,
   ]);
 
   // Interest projection
@@ -279,11 +266,6 @@ export function usePaymentState(app?: PaymentAppInput) {
     selectedAmount: clampedAmount,
     setAmount,
     minimumPayment,
-    /**
-     * Anchor inside the minimum: the credit-line minimum, with the due
-     * instalments making up the rest. Zero when the split isn't shown.
-     */
-    creditMinimum,
     /** The part of `minimumPayment` / `dueBalance` that is due Flex instalments. */
     flexDueAmount,
     /** Instalments beyond this period — outside every wheel figure. */

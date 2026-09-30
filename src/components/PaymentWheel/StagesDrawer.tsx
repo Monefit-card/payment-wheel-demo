@@ -112,10 +112,7 @@ export function StagesDrawer({
             {description}
           </p>
 
-          {flexDueAmount > 0 &&
-            (zoneInfo.zone === 'at_minimum' ||
-              zoneInfo.zone === 'at_credit_minimum' ||
-              zoneInfo.zone === 'between_credit_min_min') && (
+          {flexDueAmount > 0 && zoneInfo.zone === 'at_minimum' && (
             <button
               type="button"
               disabled={!onOpenFlex}

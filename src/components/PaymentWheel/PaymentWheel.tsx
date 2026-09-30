@@ -4,11 +4,9 @@ import { useState } from 'react';
 import { WheelSVG } from './WheelSVG';
 import { StagesDrawer } from './StagesDrawer';
 import {
-  BrandMark,
   ChooseMethodSheet,
   DEFAULT_METHOD_ID,
-  getMethodBrand,
-  getMethodShortLabel,
+  MethodPill,
 } from '@/components/PaymentMethods/ChooseMethodSheet';
 import { ProjectionBox } from '@/components/ui/ProjectionBox';
 import { PaymentStateReturn } from '@/hooks/usePaymentState';
@@ -31,7 +29,6 @@ export function PaymentWheel({ state, onBack, onPay, onOpenFlex }: PaymentWheelP
     selectedAmount,
     setAmount,
     minimumPayment,
-    creditMinimum,
     flexDueAmount,
     flexFutureAmount,
     settlementTotal,
@@ -84,34 +81,11 @@ export function PaymentWheel({ state, onBack, onPay, onOpenFlex }: PaymentWheelP
           </svg>
         </button>
 
-        <button
+        <MethodPill
+          methodId={methodId}
           onClick={() => setMethodSheetOpen(true)}
-          aria-label="Change payment method"
-          className="absolute right-5 top-1 h-11 px-2.5 flex items-center gap-1.5 rounded-[15px]"
-          style={{
-            background: COLORS.surface,
-            boxShadow: '0 1px 2px rgba(17,17,19,0.05), 0 2px 8px rgba(17,17,19,0.04)',
-          }}
-        >
-          <BrandMark brand={getMethodBrand(methodId)} width={26} />
-          {getMethodShortLabel(methodId) && (
-            <span
-              className="text-[14px] tabular-nums"
-              style={{ color: COLORS.textPrimary }}
-            >
-              {getMethodShortLabel(methodId)}
-            </span>
-          )}
-          <svg width="12" height="12" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-            <path
-              d="M3.5 5.5L7 9l3.5-3.5"
-              stroke={COLORS.textSecondary}
-              strokeWidth="1.7"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </button>
+          className="absolute right-5 top-1"
+        />
 
         <div className="text-center px-28">
           <h1
@@ -129,7 +103,6 @@ export function PaymentWheel({ state, onBack, onPay, onOpenFlex }: PaymentWheelP
           accountState={accountState}
           selectedAmount={selectedAmount}
           minimumPayment={minimumPayment}
-          creditMinimum={creditMinimum}
           isZeroBalance={isZeroBalance}
           zoneInfo={zoneInfo}
           accountTotalBalance={round2(accountState.totalBalance + flexFutureAmount)}

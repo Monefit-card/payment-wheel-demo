@@ -8,7 +8,7 @@ import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { Sheet } from '@/components/ui/Sheet';
 import { IconHelp } from '@/components/ui/icons';
 import { COLORS } from '@/lib/constants';
-import { flexRemainingTotal, flexSettlementQuote, planCloseEligibility } from '@/lib/flex-math';
+import { flexRemainingTotal, planCloseEligibility, planPayoffQuote } from '@/lib/flex-math';
 import { openIntercom } from '@/lib/intercom';
 import { formatEuro } from '@/lib/payment-math';
 import { FlexPlan } from '@/types/app';
@@ -22,7 +22,7 @@ interface FlexPlanDetailProps {
   /** True when this period's minimum has been paid. */
   minimumPaid: boolean;
   onBack: () => void;
-  /** Opens the payoff wheel for this plan. */
+  /** Opens the early payoff for this plan. */
   onPayoff: () => void;
   /** Converts the plan's remaining balance back to Credit. */
   onClosePlan: (id: string) => void;
@@ -41,7 +41,7 @@ export function FlexPlanDetail({
   const [closeOpen, setCloseOpen] = useState(false);
 
   const remaining = flexRemainingTotal([plan]);
-  const settlement = flexSettlementQuote([plan]);
+  const payoff = planPayoffQuote(plan);
   const eligibility = planCloseEligibility(plan, { accountBlocked, minimumPaid });
 
   return (
@@ -64,7 +64,7 @@ export function FlexPlanDetail({
       }
       footer={
         <>
-          <PrimaryButton onClick={onPayoff}>Pay off instalments</PrimaryButton>
+          <PrimaryButton onClick={onPayoff}>Pay off early</PrimaryButton>
           <div className="h-2.5" />
           <PrimaryButton variant="light" onClick={() => setCloseOpen(true)}>
             Close Flex
@@ -125,7 +125,7 @@ export function FlexPlanDetail({
           style={{ color: COLORS.labelMuted }}
         >
           {eligibility.allowed
-            ? `The ${formatEuro(remaining)} left on this plan moves back onto your credit bill. Your minimum payment drops, but the balance starts charging card interest instead of the plan's 15% — so it costs more the longer you carry it. Settling instead would cost ${formatEuro(settlement.principal)} today.`
+            ? `The ${formatEuro(remaining)} left on this plan moves back onto your credit bill. Your minimum payment drops, but the balance starts charging card interest instead of the plan's 15% — so it costs more the longer you carry it. Paying it off instead would cost ${formatEuro(payoff.total)} today.`
             : eligibility.reason}
         </div>
 
@@ -152,7 +152,7 @@ export function FlexPlanDetail({
                 onPayoff();
               }}
             >
-              Pay off instalments
+              Pay off early
             </PrimaryButton>
             <div className="h-2.5" />
             <PrimaryButton variant="light" onClick={() => setCloseOpen(false)}>

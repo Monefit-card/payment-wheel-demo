@@ -110,6 +110,51 @@ export function BrandMark({
   );
 }
 
+/* ── Pill ── */
+
+/**
+ * The selected method as a tappable pill — brand mark, last four, chevron.
+ * Opens the sheet below; placement is the caller's.
+ */
+export function MethodPill({
+  methodId,
+  onClick,
+  className = '',
+}: {
+  methodId: string;
+  onClick: () => void;
+  className?: string;
+}) {
+  const label = getMethodShortLabel(methodId);
+  return (
+    <button
+      onClick={onClick}
+      aria-label="Change payment method"
+      className={`h-11 px-2.5 flex items-center gap-1.5 rounded-[15px] ${className}`}
+      style={{
+        background: COLORS.surface,
+        boxShadow: '0 1px 2px rgba(17,17,19,0.05), 0 2px 8px rgba(17,17,19,0.04)',
+      }}
+    >
+      <BrandMark brand={getMethodBrand(methodId)} width={26} />
+      {label && (
+        <span className="text-[14px] tabular-nums" style={{ color: COLORS.textPrimary }}>
+          {label}
+        </span>
+      )}
+      <svg width="12" height="12" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+        <path
+          d="M3.5 5.5L7 9l3.5-3.5"
+          stroke={COLORS.textSecondary}
+          strokeWidth="1.7"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    </button>
+  );
+}
+
 /* ── Selection control ── */
 
 function SelectionDot({ selected }: { selected: boolean }) {

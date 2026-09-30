@@ -59,14 +59,6 @@ export const COLORS = {
 export const STAGE_ARC: Record<PaymentZone, { from: string; to: string; handle: string }> = {
   at_zero:           { from: '#a8e82a', to: '#22d94f', handle: '#cff5db' },
   below_minimum:     { from: '#fa1e0a', to: '#ff6b2e', handle: '#ffd3c4' },
-  // The credit-line minimum covered but the due instalments not: still short
-  // of the minimum, so it reads exactly as below_minimum does. Nothing about
-  // this stop should suggest the minimum has been met.
-  at_credit_minimum: { from: '#fa1e0a', to: '#ff6b2e', handle: '#ffd3c4' },
-  // Climbing through the instalment slice of the minimum: a step further along
-  // the ramp, still short of at_minimum.
-  between_credit_min_min:
-                     { from: '#f6480f', to: '#fd9439', handle: '#fce1cd' },
   at_minimum:        { from: '#f4571a', to: '#fba33f', handle: '#fbe7d0' },
   between_min_due:   { from: '#fa9a2e', to: '#ffe81a', handle: '#fdf6be' },
   at_due:            { from: '#a8e82a', to: '#22d94f', handle: '#cff5db' },

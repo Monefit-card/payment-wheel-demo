@@ -27,12 +27,6 @@ interface WheelSVGProps {
   accountState: AccountState;
   selectedAmount: number;
   minimumPayment: number;
-  /**
-   * The credit-line slice of the minimum, when the minimum is shown split.
-   * Draws an extra anchor between it and the due Flex instalments stacked on
-   * top; 0 (the default) leaves the minimum as one undivided step.
-   */
-  creditMinimum?: number;
   isZeroBalance: boolean;
   zoneInfo: ZoneInfo;
   /**
@@ -61,7 +55,6 @@ export function WheelSVG({
   accountState,
   selectedAmount,
   minimumPayment,
-  creditMinimum = 0,
   isZeroBalance,
   zoneInfo,
   accountTotalBalance,
@@ -111,15 +104,10 @@ export function WheelSVG({
 
   const minRatio = wheelMax > 0 ? amountToRatio(minimumPayment, 0, wheelMax) : 0;
   const dueRatio = wheelMax > 0 ? amountToRatio(dueBalance, 0, wheelMax) : 0;
-  const creditMinRatio = wheelMax > 0 ? amountToRatio(creditMinimum, 0, wheelMax) : 0;
 
   const minPos = useMemo(() =>
     polarToCartesian(WHEEL.cx, WHEEL.cy, WHEEL.radius, ratioToAngle(minRatio)),
   [minRatio]);
-
-  const creditMinPos = useMemo(() =>
-    polarToCartesian(WHEEL.cx, WHEEL.cy, WHEEL.radius, ratioToAngle(creditMinRatio)),
-  [creditMinRatio]);
 
   const duePos = useMemo(() =>
     polarToCartesian(WHEEL.cx, WHEEL.cy, WHEEL.radius, ratioToAngle(dueRatio)),
@@ -142,16 +130,6 @@ export function WheelSVG({
     minimumPayment > 0 && minimumPayment < dueBalance - wheelMax * 0.04;
   const hasDueMilestone =
     dueBalance > 0 && dueBalance < totalBalance - wheelMax * 0.01;
-  /**
-   * The split anchor inside the minimum. It needs clear air on both sides: a
-   * snap window (3%) off 12 o'clock, where the total anchor already sits and
-   * below which the point isn't separately reachable anyway, and a dot's width
-   * more (4%) below the minimum's own anchor.
-   */
-  const hasCreditMinSplit =
-    hasDistinctMin &&
-    creditMinimum > wheelMax * 0.03 &&
-    creditMinimum < minimumPayment - wheelMax * 0.04;
 
   /**
    * Anchor the wheel snaps to — minimum, bill, total. Anchors the arc has
@@ -252,7 +230,6 @@ export function WheelSVG({
     // Anchor snapping: candidates win over the grid. 3% window comfortably
     // exceeds the 1% grid step, so anchors always pull cleanly off-grid.
     const candidates: Array<{ value: number; label: string }> = [];
-    if (hasCreditMinSplit) candidates.push({ value: creditMinimum, label: 'credit-min' });
     if (minimumPayment > 0) candidates.push({ value: minimumPayment, label: 'min' });
     if (dueBalance > 0) candidates.push({ value: dueBalance, label: 'due' });
     candidates.push({ value: totalBalance, label: 'total' });
@@ -306,8 +283,6 @@ export function WheelSVG({
     wheelMax,
     hasSettlement,
     minimumPayment,
-    creditMinimum,
-    hasCreditMinSplit,
     dueBalance,
     onAmountChange,
     getSVGPoint,
@@ -392,12 +367,6 @@ export function WheelSVG({
         {/* Anchor points the wheel snaps to */}
         {!isZeroBalance && (
           <>
-            {hasCreditMinSplit &&
-              anchorDot(
-                creditMinPos,
-                'credit-min-anchor',
-                selectedRatio >= creditMinRatio - 0.001,
-              )}
             {hasDistinctMin &&
               anchorDot(minPos, 'min-anchor', selectedRatio >= minRatio - 0.001)}
             {hasDueMilestone &&

@@ -245,6 +245,36 @@ export function amortisationRows(
   });
 }
 
+/**
+ * Principal and interest inside each unpaid instalment, read from the schedule
+ * as it stands rather than as it was created. A prepayment rewrites the
+ * upcoming amounts, so rebuilding from `plan.amount` would quote principal
+ * that's already been paid. The balance still owed is the present value of
+ * what's left to pay; each instalment then takes a month's interest on it and
+ * the rest comes off principal. Indexed like `plan.instalments`; `undefined`
+ * for paid and cancelled ones.
+ */
+export function remainingRows(
+  plan: FlexPlan,
+): ({ principal: number; interest: number } | undefined)[] {
+  const r = FLEX_RATE / 12;
+  const unpaid = plan.instalments.filter(
+    (i) => i.state === 'due' || i.state === 'upcoming',
+  );
+  let balance = round2(
+    unpaid.reduce((sum, i, k) => sum + i.amount / Math.pow(1 + r, k + 1), 0),
+  );
+
+  return plan.instalments.map((instalment) => {
+    if (instalment.state !== 'due' && instalment.state !== 'upcoming') return undefined;
+    const isLast = instalment === unpaid[unpaid.length - 1];
+    const interest = round2(balance * r);
+    const principal = isLast ? balance : round2(instalment.amount - interest);
+    balance = round2(balance - principal);
+    return { principal, interest };
+  });
+}
+
 /* ── Early settlement ────────────────────────────────────────────────────── */
 
 export interface SettlementQuote {
@@ -268,7 +298,7 @@ export function flexSettlementQuote(plans: FlexPlan[]): SettlementQuote {
   let interestSaved = 0;
 
   for (const plan of plans) {
-    const rows = amortisationRows(plan.amount, plan.n);
+    const rows = remainingRows(plan);
     plan.instalments.forEach((instalment, i) => {
       if (instalment.state !== 'upcoming') return;
       const row = rows[i];
@@ -281,71 +311,143 @@ export function flexSettlementQuote(plans: FlexPlan[]): SettlementQuote {
   return { principal: round2(principal), interestSaved: round2(interestSaved) };
 }
 
-/* ── The two repayment methods ───────────────────────────────────────────── */
+/* ── Paying off one plan early ───────────────────────────────────────────── */
 
 /**
- * METHOD 2 — clear whole instalments.
- *
- * One stop per unpaid instalment, cumulative, in schedule order — the NEXT
- * instalments are settled, not the last ones. So nothing falls due for the
- * periods cleared, the instalment amount never changes, and the plan's end
- * date doesn't move.
- *
- * Because interest is charged monthly on a declining balance, the earliest
- * instalments carry the most of it. Clearing them therefore forgives slightly
- * more interest per euro than spreading the same payment (`spreadPayment`).
- *
- * Pricing follows what has accrued. The instalment on this period's bill costs
- * its full scheduled amount, because its interest has been earned. Upcoming
- * ones cost principal only — their interest hasn't been charged yet, so it's
- * forgiven.
- *
- * Used by the per-plan wheel in Flex.
+ * The first day of the billing period `date` falls in — the day after the last
+ * statement closed. Interest accrued from here on isn't on any statement yet.
  */
-export interface PayoffStop {
-  /** How many unpaid instalments this stop clears. */
-  count: number;
-  /** What leaves the account today. */
-  amount: number;
-  /** Interest forgiven by clearing them now. */
-  saved: number;
+export function periodStart(date: Date): Date {
+  const end = periodEnd(date);
+  return new Date(end.getFullYear(), end.getMonth() - 1, 16);
 }
 
-export function payoffStops(
-  plan: FlexPlan,
-  /**
-   * Where the run starts. 'due' includes the instalment on this period's bill
-   * — what the Flex wheel offers. 'upcoming' skips it, which is the case for a
-   * payment made outside the minimum.
-   */
-  from: 'due' | 'upcoming' = 'due',
-): PayoffStop[] {
-  const rows = amortisationRows(
-    plan.amount,
-    plan.n,
-    parsePlanDate(plan.instalments[0]?.date ?? ''),
-  );
-  let amount = 0;
-  let saved = 0;
-  const stops: PayoffStop[] = [];
+export interface PlanPayoffQuote {
+  /** Principal still owed on the plan — every unpaid instalment's, billed included. */
+  principal: number;
+  /** Interest accrued on it since the statement closed, not billed yet. */
+  accrued: number;
+  /** Where that accrual starts (the day after the statement closed). */
+  accruedFrom: Date;
+  /** Everything above: what clears the plan today. */
+  total: number;
+  /** Interest the unpaid instalments were scheduled to charge. */
+  scheduledInterest: number;
+  /** scheduledInterest − accrued: the interest that is never charged. */
+  saved: number;
+  /** Unpaid instalments the principal is spread across. */
+  instalments: number;
+}
+
+/** Instalments still to pay — this period's and every later one. */
+function isUnpaid(instalment: Instalment): boolean {
+  return instalment.state === 'due' || instalment.state === 'upcoming';
+}
+
+/**
+ * The cost of paying one plan off today: every euro of principal still owed,
+ * plus the interest accrued on it since the last statement closed, charged per
+ * day. The instalment on this period's bill is part of the plan, so it's
+ * included — paying the plan off here takes it out of the minimum rather than
+ * charging it twice. Every scheduled euro of interest beyond what has accrued
+ * is forgiven, which is the saving.
+ */
+export function planPayoffQuote(plan: FlexPlan, today: Date = new Date()): PlanPayoffQuote {
+  const rows = remainingRows(plan);
+
+  let principal = 0;
+  let scheduledInterest = 0;
+  let instalments = 0;
 
   plan.instalments.forEach((instalment, i) => {
-    if (instalment.state !== 'due' && instalment.state !== 'upcoming') return;
-    if (from === 'upcoming' && instalment.state === 'due') return;
     const row = rows[i];
-    if (!row) return;
-
-    if (instalment.state === 'due') {
-      amount = round2(amount + row.payment);
-    } else {
-      amount = round2(amount + row.principal);
-      saved = round2(saved + row.interest);
-    }
-
-    stops.push({ count: stops.length + 1, amount, saved });
+    if (!row || !isUnpaid(instalment)) return;
+    principal += row.principal;
+    scheduledInterest += row.interest;
+    instalments += 1;
   });
 
-  return stops;
+  const accruedFrom = periodStart(today);
+  const days = Math.max(
+    0,
+    Math.round((today.getTime() - accruedFrom.getTime()) / 86_400_000),
+  );
+  const accrued = round2(principal * (FLEX_RATE / 365) * days);
+
+  return {
+    principal: round2(principal),
+    accrued,
+    accruedFrom,
+    total: round2(principal + accrued),
+    scheduledInterest: round2(scheduledInterest),
+    saved: round2(Math.max(0, scheduledInterest - accrued)),
+    instalments,
+  };
+}
+
+export interface PlanPrepayment {
+  /** The payment, capped at the payoff total. */
+  amount: number;
+  /** Of which principal — spread across every unpaid instalment. */
+  toPrincipal: number;
+  /** Of which accrued interest — only once principal is at zero. */
+  toInterest: number;
+  /** Each unpaid instalment before and after. */
+  monthlyBefore: number;
+  monthlyAfter: number;
+  /** Future interest the payment forgives. */
+  saved: number;
+  /** True when the payment clears the plan. */
+  paidOff: boolean;
+  /** The schedule as it would stand. */
+  instalments: Instalment[];
+}
+
+/**
+ * A payment on one plan, allocated the one way the product offers: principal
+ * first, spread equally across every unpaid instalment (same count, same
+ * dates, each one smaller — this period's included, so the minimum drops
+ * too), and accrued interest only once the principal is gone. The top of the
+ * range is `planPayoffQuote().total`, which clears the plan.
+ */
+export function planPrepayment(
+  plan: FlexPlan,
+  payment: number,
+  today: Date = new Date(),
+): PlanPrepayment {
+  const quote = planPayoffQuote(plan, today);
+  const amount = round2(Math.max(0, Math.min(payment, quote.total)));
+  const toPrincipal = round2(Math.min(amount, quote.principal));
+  const toInterest = round2(amount - toPrincipal);
+  const principalAfter = round2(quote.principal - toPrincipal);
+
+  const unpaid = plan.instalments.filter(isUnpaid);
+  const monthlyBefore = unpaid[0]?.amount ?? 0;
+  // Same count, same rate, smaller balance.
+  const after = principalAfter > 0 ? calcPlan(principalAfter, unpaid.length) : null;
+
+  const instalments = plan.instalments.map((instalment): Instalment => {
+    if (!isUnpaid(instalment)) return instalment;
+    if (!after) return { ...instalment, state: 'paid' };
+    const last = instalment === unpaid[unpaid.length - 1];
+    return { ...instalment, amount: last ? after.last : after.monthly };
+  });
+
+  return {
+    amount,
+    toPrincipal,
+    toInterest,
+    monthlyBefore,
+    monthlyAfter: after ? after.monthly : 0,
+    // Interest on a fixed schedule is proportional to its principal, so the
+    // saving is the payoff's saving in the share of principal cleared — what
+    // has already accrued is owed either way.
+    saved: after
+      ? round2(quote.principal > 0 ? quote.saved * (toPrincipal / quote.principal) : 0)
+      : quote.saved,
+    paidOff: !after,
+    instalments,
+  };
 }
 
 /**
@@ -382,11 +484,7 @@ export interface SpreadOutcome {
 }
 
 export function spreadPayment(plan: FlexPlan, payment: number): SpreadOutcome {
-  const rows = amortisationRows(
-    plan.amount,
-    plan.n,
-    parsePlanDate(plan.instalments[0]?.date ?? ''),
-  );
+  const rows = remainingRows(plan);
 
   let principalBefore = 0;
   let interestBefore = 0;

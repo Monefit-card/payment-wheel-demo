@@ -279,30 +279,36 @@ const FLEX = {
     id: 'flex_hugo',
     items: [feed('f1')],
     created: '20 Dec 25',
-    dates: ['15 Jan 26', '15 Feb 26', '15 Mar 26', '15 Apr 26'],
+    dates: ['15 Jan 26', '15 Feb 26', '15 Mar 26', '15 Apr 26', '15 May 26', '15 Jun 26'],
     dueIndex: 2,
   }),
   apple: makePlan({
     id: 'flex_apple',
     items: [feed('f3')],
-    created: '20 Oct 25',
-    dates: ['15 Nov 25', '15 Dec 25', '15 Jan 26', '15 Feb 26', '15 Mar 26', '15 Apr 26'],
-    dueIndex: 4,
+    created: '20 Jan 26',
+    dates: [
+      '15 Feb 26', '15 Mar 26', '15 Apr 26', '15 May 26', '15 Jun 26', '15 Jul 26',
+      '15 Aug 26', '15 Sep 26', '15 Oct 26', '15 Nov 26', '15 Dec 26', '15 Jan 27',
+    ],
+    dueIndex: 1,
   }),
   kaup24: makePlan({
     id: 'flex_kaup24',
     items: [feed('f5')],
     created: '20 Jan 26',
-    dates: ['15 Feb 26', '15 Mar 26', '15 Apr 26'],
+    dates: ['15 Feb 26', '15 Mar 26', '15 Apr 26', '15 May 26', '15 Jun 26', '15 Jul 26'],
     dueIndex: 1,
   }),
   /** The Apple plan a month later — the blocked scenario's period is Mar 26. */
   appleMar: makePlan({
     id: 'flex_apple',
     items: [feed('f3')],
-    created: '20 Nov 25',
-    dates: ['15 Dec 25', '15 Jan 26', '15 Feb 26', '15 Mar 26', '15 Apr 26', '15 May 26'],
-    dueIndex: 4,
+    created: '20 Feb 26',
+    dates: [
+      '15 Mar 26', '15 Apr 26', '15 May 26', '15 Jun 26', '15 Jul 26', '15 Aug 26',
+      '15 Sep 26', '15 Oct 26', '15 Nov 26', '15 Dec 26', '15 Jan 27', '15 Feb 27',
+    ],
+    dueIndex: 1,
   }),
 };
 
